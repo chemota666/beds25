@@ -8,15 +8,22 @@ export const Properties: React.FC = () => {
   const [editingProperty, setEditingProperty] = useState<Property | null>(null);
   const [isPropertyModalOpen, setIsPropertyModalOpen] = useState(false);
 
+  // FIX: Wrapped async call in a function within useEffect
   useEffect(() => {
-    setProperties(db.getProperties());
+    const loadProperties = async () => {
+      const props = await db.getProperties();
+      setProperties(props);
+    };
+    loadProperties();
   }, []);
 
-  const handleSaveProperty = (e: React.FormEvent) => {
+  // FIX: Made handleSaveProperty async to await database operations
+  const handleSaveProperty = async (e: React.FormEvent) => {
     e.preventDefault();
     if (editingProperty) {
-      db.saveProperty(editingProperty);
-      setProperties(db.getProperties());
+      await db.saveProperty(editingProperty);
+      const props = await db.getProperties();
+      setProperties(props);
       setIsPropertyModalOpen(false);
       setEditingProperty(null);
     }
@@ -34,10 +41,12 @@ export const Properties: React.FC = () => {
     setIsPropertyModalOpen(true);
   };
 
-  const handleDeleteProperty = (id: string) => {
+  // FIX: Made handleDeleteProperty async to await database operations
+  const handleDeleteProperty = async (id: string) => {
     if (confirm('¿Estás seguro de que quieres eliminar este inmueble y todas sus habitaciones?')) {
-      db.deleteProperty(id);
-      setProperties(db.getProperties());
+      await db.deleteProperty(id);
+      const props = await db.getProperties();
+      setProperties(props);
     }
   };
 

@@ -1,5 +1,6 @@
 
 import { Property, Room, Reservation, Guest } from '../types';
+import { sheetsApi } from './sheetsApi';
 
 const KEYS = {
   PROPERTIES: 'roomflow_properties',
@@ -10,116 +11,118 @@ const KEYS = {
   AUTH_USER: 'roomflow_auth_user'
 };
 
-const INITIAL_PROPERTIES: Property[] = [
-  { id: 'p1', name: 'Edificio Centro', address: 'Gran Vía 12', city: 'Madrid', owner: 'Inmuebles Paco', numRooms: 5 },
-  { id: 'p2', name: 'Residencia Sol', address: 'Calle Mayor 5', city: 'Madrid', owner: 'Gestión Inmo', numRooms: 3 }
-];
-
-const INITIAL_ROOMS: Room[] = [
-  { id: 'r1', propertyId: 'p1', name: 'Habitación 101' },
-  { id: 'r2', propertyId: 'p1', name: 'Habitación 102' },
-  { id: 'r3', propertyId: 'p1', name: 'Habitación 201' },
-  { id: 'r4', propertyId: 'p1', name: 'Habitación 202' },
-  { id: 'r5', propertyId: 'p1', name: 'Habitación 301' },
-  { id: 'r6', propertyId: 'p2', name: 'Suite A' },
-  { id: 'r7', propertyId: 'p2', name: 'Suite B' },
-  { id: 'r8', propertyId: 'p2', name: 'Habitación S1' }
-];
-
 export const db = {
-  getProperties: (): Property[] => {
-    const data = localStorage.getItem(KEYS.PROPERTIES);
-    if (!data) {
-      localStorage.setItem(KEYS.PROPERTIES, JSON.stringify(INITIAL_PROPERTIES));
-      return INITIAL_PROPERTIES;
+  getProperties: async (): Promise<Property[]> => {
+    const data = await sheetsApi.fetchSheet('properties');
+    if (data.length === 0) {
+      // Si el sheet está vacío, intentamos cargar de local o usar iniciales
+      const local = localStorage.getItem(KEYS.PROPERTIES);
+      return local ? JSON.parse(local) : [];
     }
-    return JSON.parse(data);
+    return data;
   },
   
-  saveProperty: (prop: Property) => {
-    const props = db.getProperties();
+  saveProperty: async (prop: Property) => {
+    // Primero en local para feedback instantáneo
+    const props = await db.getProperties();
     const index = props.findIndex(p => p.id === prop.id);
-    if (index >= 0) props[index] = prop;
-    else props.push(prop);
+    const action = index >= 0 ? 'update' : 'append';
+    if (index >= 0) props[index] = prop; else props.push(prop);
     localStorage.setItem(KEYS.PROPERTIES, JSON.stringify(props));
+    
+    // Luego al Sheet
+    await sheetsApi.postAction('properties', action, prop, prop.id);
   },
 
-  getRooms: (propertyId?: string): Room[] => {
-    const data = localStorage.getItem(KEYS.ROOMS);
-    let rooms: Room[] = data ? JSON.parse(data) : INITIAL_ROOMS;
-    if (!data) localStorage.setItem(KEYS.ROOMS, JSON.stringify(INITIAL_ROOMS));
+  getRooms: async (propertyId?: string): Promise<Room[]> => {
+    const data = await sheetsApi.fetchSheet('rooms');
+    let rooms: Room[] = data;
+    if (data.length === 0) {
+      const local = localStorage.getItem(KEYS.ROOMS);
+      rooms = local ? JSON.parse(local) : [];
+    }
     return propertyId ? rooms.filter(r => r.propertyId === propertyId) : rooms;
   },
 
-  getGuests: (): Guest[] => {
-    const data = localStorage.getItem(KEYS.GUESTS);
-    return data ? JSON.parse(data) : [];
+  getGuests: async (): Promise<Guest[]> => {
+    const data = await sheetsApi.fetchSheet('guests');
+    if (data.length === 0) {
+      const local = localStorage.getItem(KEYS.GUESTS);
+      return local ? JSON.parse(local) : [];
+    }
+    return data;
   },
 
-  saveGuest: (guest: Guest) => {
-    const guests = db.getGuests();
+  saveGuest: async (guest: Guest) => {
+    const guests = await db.getGuests();
     const index = guests.findIndex(g => g.id === guest.id);
-    if (index >= 0) guests[index] = guest;
-    else guests.push(guest);
+    const action = index >= 0 ? 'update' : 'append';
+    if (index >= 0) guests[index] = guest; else guests.push(guest);
     localStorage.setItem(KEYS.GUESTS, JSON.stringify(guests));
+    
+    await sheetsApi.postAction('guests', action, guest, guest.id);
   },
 
-  deleteGuest: (id: string) => {
-    const guests = db.getGuests().filter(g => g.id !== id);
+  deleteGuest: async (id: string) => {
+    const guests = (await db.getGuests()).filter(g => g.id !== id);
     localStorage.setItem(KEYS.GUESTS, JSON.stringify(guests));
+    await sheetsApi.postAction('guests', 'delete', {}, id);
   },
 
-  getReservations: (): Reservation[] => {
-    const data = localStorage.getItem(KEYS.RESERVATIONS);
-    return data ? JSON.parse(data) : [];
+  getReservations: async (): Promise<Reservation[]> => {
+    const data = await sheetsApi.fetchSheet('reservations');
+    if (data.length === 0) {
+      const local = localStorage.getItem(KEYS.RESERVATIONS);
+      return local ? JSON.parse(local) : [];
+    }
+    return data;
   },
 
-  checkOverbooking: (newRes: Reservation): boolean => {
-    const reservations = db.getReservations();
+  checkOverbooking: async (newRes: Reservation): Promise<boolean> => {
+    const reservations = await db.getReservations();
     const start = new Date(newRes.startDate).getTime();
     const end = new Date(newRes.endDate).getTime();
 
     return reservations.some(res => {
-      // Don't check against itself when editing
       if (res.id === newRes.id) return false;
-      
-      // Only check same room
       if (res.roomId !== newRes.roomId) return false;
+      if (res.status === 'cancelled') return false;
 
       const resStart = new Date(res.startDate).getTime();
       const resEnd = new Date(res.endDate).getTime();
-
-      // Standard overlap check: (StartA < EndB) and (EndA > StartB)
       return start < resEnd && end > resStart;
     });
   },
 
-  saveReservation: (res: Reservation) => {
-    const reservations = db.getReservations();
+  saveReservation: async (res: Reservation) => {
+    const reservations = await db.getReservations();
     const index = reservations.findIndex(r => r.id === res.id);
+    const action = index >= 0 ? 'update' : 'append';
     
     if (index >= 0) {
       reservations[index] = res;
     } else {
-      let lastNumber = Number(localStorage.getItem(KEYS.LAST_RES_NUMBER) || '1000');
+      let lastNumber = Number(localStorage.getItem(KEYS.LAST_RES_NUMBER) || '1002');
       lastNumber++;
       res.reservationNumber = lastNumber;
       localStorage.setItem(KEYS.LAST_RES_NUMBER, lastNumber.toString());
       reservations.push(res);
     }
     localStorage.setItem(KEYS.RESERVATIONS, JSON.stringify(reservations));
+    await sheetsApi.postAction('reservations', action, res, res.id);
   },
 
-  deleteReservation: (id: string) => {
-    const reservations = db.getReservations().filter(r => r.id !== id);
+  deleteReservation: async (id: string) => {
+    const reservations = (await db.getReservations()).filter(r => r.id !== id);
     localStorage.setItem(KEYS.RESERVATIONS, JSON.stringify(reservations));
+    await sheetsApi.postAction('reservations', 'delete', {}, id);
   },
 
-  deleteProperty: (id: string) => {
-    const props = db.getProperties().filter(p => p.id !== id);
+  deleteProperty: async (id: string) => {
+    const props = (await db.getProperties()).filter(p => p.id !== id);
     localStorage.setItem(KEYS.PROPERTIES, JSON.stringify(props));
-    const rooms = db.getRooms().filter(r => r.propertyId !== id);
-    localStorage.setItem(KEYS.ROOMS, JSON.stringify(rooms));
+    await sheetsApi.postAction('properties', 'delete', {}, id);
+    // Nota: Las habitaciones y reservas asociadas deberían borrarse también en una implementación completa
   },
 
   setAuthUser: (username: string | null) => {

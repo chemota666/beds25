@@ -1,6 +1,7 @@
 
-export type PaymentMethod = 'transfer' | 'cash';
+export type PaymentMethod = 'pending' | 'transfer' | 'cash';
 export type ReservationStatus = 'pending' | 'confirmed' | 'cancelled' | 'checked-out';
+export type Sex = 'Masculino' | 'Femenino' | 'Otro';
 
 export interface Guest {
   id: string;
@@ -8,10 +9,13 @@ export interface Guest {
   surname: string;
   dni: string;
   nationality: string;
+  sex: Sex;
+  isRegistered: boolean; // Empadronado
   email?: string;
   phone?: string;
   dniFile?: string; // base64 string
   contractFile?: string; // base64 string
+  depositReceiptFile?: string; // base64 string
 }
 
 export interface Property {

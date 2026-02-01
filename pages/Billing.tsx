@@ -10,11 +10,21 @@ export const Billing: React.FC = () => {
   const [guests, setGuests] = useState<Guest[]>([]);
   const [filter, setFilter] = useState({ propertyId: '', status: '' });
 
+  // FIX: Handled multiple async calls correctly within useEffect
   useEffect(() => {
-    setReservations(db.getReservations());
-    setProperties(db.getProperties());
-    setRooms(db.getRooms());
-    setGuests(db.getGuests());
+    const loadData = async () => {
+      const [resData, propsData, roomsData, guestsData] = await Promise.all([
+        db.getReservations(),
+        db.getProperties(),
+        db.getRooms(),
+        db.getGuests()
+      ]);
+      setReservations(resData);
+      setProperties(propsData);
+      setRooms(roomsData);
+      setGuests(guestsData);
+    };
+    loadData();
   }, []);
 
   const filteredData = useMemo(() => {

@@ -14,6 +14,7 @@ interface TimelineProps {
 }
 
 const paymentColors: Record<PaymentMethod, string> = {
+  'pending': 'bg-yellow-400 text-white border-yellow-500',
   'transfer': 'bg-blue-500 text-white border-blue-600',
   'cash': 'bg-green-500 text-white border-green-600',
 };
@@ -21,8 +22,13 @@ const paymentColors: Record<PaymentMethod, string> = {
 export const Timeline: React.FC<TimelineProps> = ({ rooms, reservations, properties, currentDate, onCellClick, onReservationClick, isAllProperties }) => {
   const [guests, setGuests] = useState<Guest[]>([]);
   
+  // FIX: Handled async call to db.getGuests() correctly within useEffect
   useEffect(() => {
-    setGuests(db.getGuests());
+    const loadGuests = async () => {
+      const data = await db.getGuests();
+      setGuests(data);
+    };
+    loadGuests();
   }, [reservations]);
 
   const days = useMemo(() => {
@@ -50,6 +56,15 @@ export const Timeline: React.FC<TimelineProps> = ({ rooms, reservations, propert
   const getGuestDisplayName = (guestId: string) => {
     const g = guests.find(guest => guest.id === guestId);
     return g ? `${g.name} ${g.surname}` : 'Desconocido';
+  };
+
+  const getPaymentLabel = (method: PaymentMethod) => {
+    switch(method) {
+      case 'cash': return 'Efectivo';
+      case 'transfer': return 'Banco';
+      case 'pending': return 'Pendiente';
+      default: return method;
+    }
   };
 
   return (
@@ -129,7 +144,7 @@ export const Timeline: React.FC<TimelineProps> = ({ rooms, reservations, propert
                         )}
                       </div>
                       <div className="text-[9px] opacity-90 truncate italic">
-                        {res.paymentMethod === 'transfer' ? 'Transfer' : 'Efectivo'} {res.notes ? `• ${res.notes}` : ''}
+                        {getPaymentLabel(res.paymentMethod)} {res.notes ? `• ${res.notes}` : ''}
                       </div>
                     </div>
                   );

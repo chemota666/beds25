@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { db } from '../services/db';
-import { Property, Room, Reservation, ReservationStatus } from '../types';
+import { Property, Room, Reservation } from '../types';
 import { Timeline } from '../components/Timeline';
 import { ReservationModal } from '../components/ReservationModal';
 
@@ -11,24 +11,35 @@ export const Dashboard: React.FC = () => {
   const [rooms, setRooms] = useState<Room[]>([]);
   const [reservations, setReservations] = useState<Reservation[]>([]);
   const [currentDate, setCurrentDate] = useState(new Date());
+  const [loading, setLoading] = useState(true);
   
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingReservation, setEditingReservation] = useState<Reservation | null>(null);
   const [initialDataForNew, setInitialDataForNew] = useState<{ roomId: string, date: string } | null>(null);
 
   useEffect(() => {
-    const props = db.getProperties();
-    setProperties(props);
+    const loadProperties = async () => {
+      const props = await db.getProperties();
+      setProperties(props);
+    };
+    loadProperties();
   }, []);
 
   useEffect(() => {
-    if (selectedPropertyId === 'all') {
-      setRooms(db.getRooms());
-      setReservations(db.getReservations());
-    } else {
-      setRooms(db.getRooms(selectedPropertyId));
-      setReservations(db.getReservations().filter(r => r.propertyId === selectedPropertyId));
-    }
+    const loadData = async () => {
+      setLoading(true);
+      if (selectedPropertyId === 'all') {
+        const [allRooms, allRes] = await Promise.all([db.getRooms(), db.getReservations()]);
+        setRooms(allRooms);
+        setReservations(allRes);
+      } else {
+        const [propRooms, allRes] = await Promise.all([db.getRooms(selectedPropertyId), db.getReservations()]);
+        setRooms(propRooms);
+        setReservations(allRes.filter(r => r.propertyId === selectedPropertyId));
+      }
+      setLoading(false);
+    };
+    loadData();
   }, [selectedPropertyId]);
 
   const handleCellClick = (roomId: string, date: Date) => {
@@ -43,23 +54,24 @@ export const Dashboard: React.FC = () => {
     setIsModalOpen(true);
   };
 
-  const handleSave = (res: Reservation) => {
-    db.saveReservation(res);
-    // Refresh
+  const handleSave = async (res: Reservation) => {
+    await db.saveReservation(res);
+    const updatedRes = await db.getReservations();
     if (selectedPropertyId === 'all') {
-      setReservations(db.getReservations());
+      setReservations(updatedRes);
     } else {
-      setReservations(db.getReservations().filter(r => r.propertyId === selectedPropertyId));
+      setReservations(updatedRes.filter(r => r.propertyId === selectedPropertyId));
     }
     setIsModalOpen(false);
   };
 
-  const handleDelete = (id: string) => {
-    db.deleteReservation(id);
+  const handleDelete = async (id: string) => {
+    await db.deleteReservation(id);
+    const updatedRes = await db.getReservations();
     if (selectedPropertyId === 'all') {
-      setReservations(db.getReservations());
+      setReservations(updatedRes);
     } else {
-      setReservations(db.getReservations().filter(r => r.propertyId === selectedPropertyId));
+      setReservations(updatedRes.filter(r => r.propertyId === selectedPropertyId));
     }
     setIsModalOpen(false);
   };
@@ -76,7 +88,7 @@ export const Dashboard: React.FC = () => {
     setCurrentDate(d);
   };
 
-  const activeRooms = rooms.length;
+  const activeRoomsCount = rooms.length;
   const currentOccupied = reservations.filter(r => {
     const today = new Date();
     const start = new Date(r.startDate);
@@ -84,7 +96,7 @@ export const Dashboard: React.FC = () => {
     return today >= start && today <= end && r.status === 'confirmed';
   }).length;
 
-  const occupancy = activeRooms > 0 ? Math.round((currentOccupied / activeRooms) * 100) : 0;
+  const occupancy = activeRoomsCount > 0 ? Math.round((currentOccupied / activeRoomsCount) * 100) : 0;
 
   return (
     <div className="space-y-6">
@@ -93,8 +105,8 @@ export const Dashboard: React.FC = () => {
         <div className="space-y-1">
           <h1 className="text-2xl font-black text-gray-900 tracking-tight">Calendario Maestro</h1>
           <div className="flex items-center space-x-2 text-sm text-gray-400">
-            <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
-            <span>Sistema en vivo • {activeRooms} habitaciones monitoreadas</span>
+            <span className={`w-2 h-2 rounded-full ${loading ? 'bg-orange-400 animate-spin' : 'bg-green-500 animate-pulse'}`}></span>
+            <span>{loading ? 'Cargando datos de Sheets...' : `Sistema en vivo • ${activeRoomsCount} habitaciones monitoreadas`}</span>
           </div>
         </div>
         
@@ -114,16 +126,6 @@ export const Dashboard: React.FC = () => {
             </div>
           </div>
 
-          <div className="relative">
-            <label className="absolute -top-2 left-3 bg-white px-1 text-[10px] font-bold text-blue-500 uppercase tracking-wider z-10">Ir a fecha</label>
-            <input 
-              type="date"
-              value={currentDate.toISOString().split('T')[0]}
-              onChange={(e) => setCurrentDate(new Date(e.target.value))}
-              className="bg-gray-50 border border-gray-200 rounded-xl px-4 py-2.5 font-semibold text-gray-700 focus:ring-4 focus:ring-blue-100 outline-none cursor-pointer"
-            />
-          </div>
-
           <button 
             onClick={() => { setEditingReservation(null); setInitialDataForNew(null); setIsModalOpen(true); }}
             className="bg-blue-600 text-white px-6 py-2.5 rounded-xl font-bold shadow-lg shadow-blue-200 hover:bg-blue-700 hover:-translate-y-0.5 transition-all flex items-center"
@@ -135,7 +137,8 @@ export const Dashboard: React.FC = () => {
       </div>
 
       {/* Navigation & Timeline */}
-      <div className="bg-white rounded-2xl shadow-xl border border-gray-100 p-6 overflow-hidden">
+      <div className="bg-white rounded-2xl shadow-xl border border-gray-100 p-6 overflow-hidden relative">
+        {loading && <div className="absolute inset-0 bg-white/50 backdrop-blur-[1px] z-20 flex items-center justify-center font-bold text-blue-600">Sincronizando con Google Sheets...</div>}
         <div className="flex items-center justify-between mb-8">
            <div className="flex items-center space-x-6">
              <h3 className="text-2xl font-extrabold text-gray-800 capitalize">
@@ -143,35 +146,26 @@ export const Dashboard: React.FC = () => {
              </h3>
              <div className="flex items-center space-x-4">
                 <div className="flex items-center space-x-1.5">
+                  <span className="w-3 h-3 rounded bg-blue-500"></span>
+                  <span className="text-xs font-bold text-gray-500 uppercase">Banco</span>
+                </div>
+                <div className="flex items-center space-x-1.5">
                   <span className="w-3 h-3 rounded bg-green-500"></span>
-                  <span className="text-xs font-bold text-gray-500 uppercase">Confirmadas</span>
+                  <span className="text-xs font-bold text-gray-500 uppercase">Efectivo</span>
                 </div>
                 <div className="flex items-center space-x-1.5">
                   <span className="w-3 h-3 rounded bg-yellow-400"></span>
-                  <span className="text-xs font-bold text-gray-500 uppercase">Pendientes</span>
+                  <span className="text-xs font-bold text-gray-500 uppercase">Pendiente</span>
                 </div>
              </div>
            </div>
            
            <div className="flex bg-gray-100 p-1.5 rounded-2xl">
-             <button 
-                onClick={prevMonth} 
-                className="p-3 hover:bg-white hover:shadow-md rounded-xl transition-all text-gray-600"
-                title="Mes Anterior"
-             >
+             <button onClick={prevMonth} className="p-3 hover:bg-white hover:shadow-md rounded-xl transition-all text-gray-600">
                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7"></path></svg>
              </button>
-             <button 
-                onClick={() => setCurrentDate(new Date())} 
-                className="px-6 py-2 text-sm font-black text-gray-700 uppercase tracking-widest"
-             >
-                Hoy
-             </button>
-             <button 
-                onClick={nextMonth} 
-                className="p-3 hover:bg-white hover:shadow-md rounded-xl transition-all text-gray-600"
-                title="Mes Siguiente"
-             >
+             <button onClick={() => setCurrentDate(new Date())} className="px-6 py-2 text-sm font-black text-gray-700 uppercase tracking-widest">Hoy</button>
+             <button onClick={nextMonth} className="p-3 hover:bg-white hover:shadow-md rounded-xl transition-all text-gray-600">
                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7"></path></svg>
              </button>
            </div>
@@ -186,40 +180,6 @@ export const Dashboard: React.FC = () => {
           onReservationClick={handleReservationClick}
           isAllProperties={selectedPropertyId === 'all'}
         />
-      </div>
-
-      {/* Legend & Stats Overlay */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="bg-gradient-to-br from-blue-600 to-blue-700 p-6 rounded-2xl text-white shadow-xl shadow-blue-100 relative overflow-hidden">
-          <div className="relative z-10">
-            <p className="text-xs font-black uppercase opacity-60 mb-1">Ocupación Actual</p>
-            <p className="text-4xl font-black">{occupancy}%</p>
-            <div className="mt-4 w-full bg-blue-400/30 h-2 rounded-full overflow-hidden">
-              <div className="bg-white h-full transition-all duration-1000" style={{ width: `${occupancy}%` }}></div>
-            </div>
-          </div>
-          <svg className="absolute -right-4 -bottom-4 w-32 h-32 opacity-10" fill="currentColor" viewBox="0 0 20 20"><path d="M2 11a1 1 0 011-1h2a1 1 0 011 1v5a1 1 0 01-1 1H3a1 1 0 01-1-1v-5zM8 7a1 1 0 011-1h2a1 1 0 011 1v9a1 1 0 01-1 1H9a1 1 0 01-1-1V7zM14 4a1 1 0 011-1h2a1 1 0 011 1v12a1 1 0 01-1 1h-2a1 1 0 01-1-1V4z"></path></svg>
-        </div>
-        
-        <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm flex items-center space-x-4">
-          <div className="bg-orange-100 p-4 rounded-2xl text-orange-600">
-            <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-          </div>
-          <div>
-            <p className="text-xs font-black text-gray-400 uppercase">Pendientes de Entrada</p>
-            <p className="text-3xl font-black text-gray-800">{reservations.filter(r => r.status === 'pending').length}</p>
-          </div>
-        </div>
-
-        <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm flex items-center space-x-4">
-          <div className="bg-green-100 p-4 rounded-2xl text-green-600">
-            <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-          </div>
-          <div>
-            <p className="text-xs font-black text-gray-400 uppercase">Estancias en Curso</p>
-            <p className="text-3xl font-black text-gray-800">{currentOccupied}</p>
-          </div>
-        </div>
       </div>
 
       {isModalOpen && (

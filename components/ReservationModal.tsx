@@ -19,8 +19,8 @@ export const ReservationModal: React.FC<ReservationModalProps> = ({ rooms: initi
   const [searchTerm, setSearchTerm] = useState('');
   const [isSearching, setIsSearching] = useState(false);
   const [overbookingError, setOverbookingError] = useState('');
+  const [loading, setLoading] = useState(false);
 
-  // Fixed: Added 'status' to the initial formData state
   const [formData, setFormData] = useState<Partial<Reservation>>(
     initialReservation || {
       id: Math.random().toString(36).substr(2, 9),
@@ -30,7 +30,7 @@ export const ReservationModal: React.FC<ReservationModalProps> = ({ rooms: initi
       amount: 0,
       startDate: initialData?.date || new Date().toISOString().split('T')[0],
       endDate: initialData?.date || new Date().toISOString().split('T')[0],
-      paymentMethod: 'transfer',
+      paymentMethod: 'pending',
       status: 'confirmed',
       notes: '',
       createdAt: new Date().toISOString(),
@@ -39,21 +39,18 @@ export const ReservationModal: React.FC<ReservationModalProps> = ({ rooms: initi
   );
 
   useEffect(() => {
-    setAllGuests(db.getGuests());
-    setAllProperties(db.getProperties());
+    const loadStatic = async () => {
+      const [guests, props] = await Promise.all([db.getGuests(), db.getProperties()]);
+      setAllGuests(guests);
+      setAllProperties(props);
+    };
+    loadStatic();
   }, []);
 
-  // Sync rooms when property changes
   const availableRooms = useMemo(() => {
-    return db.getRooms(formData.propertyId);
-  }, [formData.propertyId]);
-
-  // Ensure valid roomId if property changes
-  useEffect(() => {
-    if (availableRooms.length > 0 && !availableRooms.find(r => r.id === formData.roomId)) {
-      setFormData(prev => ({ ...prev, roomId: availableRooms[0].id }));
-    }
-  }, [availableRooms]);
+    // Nota: db.getRooms es async, pero aquí lo manejamos con rooms que ya tenemos o consultamos el estado si cambia prop
+    return initialRooms.filter(r => r.propertyId === formData.propertyId);
+  }, [formData.propertyId, initialRooms]);
 
   const selectedGuest = useMemo(() => 
     allGuests.find(g => g.id === formData.guestId), 
@@ -70,7 +67,7 @@ export const ReservationModal: React.FC<ReservationModalProps> = ({ rooms: initi
     ).slice(0, 5);
   }, [allGuests, searchTerm]);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setOverbookingError('');
     
@@ -84,15 +81,17 @@ export const ReservationModal: React.FC<ReservationModalProps> = ({ rooms: initi
       updatedAt: new Date().toISOString()
     };
 
-    if (db.checkOverbooking(resToSave)) {
+    setLoading(true);
+    if (await db.checkOverbooking(resToSave)) {
       setOverbookingError('¡ERROR: Overbooking! La habitación ya está ocupada en estas fechas.');
+      setLoading(false);
       return;
     }
 
     onSave(resToSave);
   };
 
-  const handleCopyToNextMonth = () => {
+  const handleCopyToNextMonth = async () => {
     const currentStart = new Date(formData.startDate || '');
     const currentEnd = new Date(formData.endDate || '');
     
@@ -111,7 +110,7 @@ export const ReservationModal: React.FC<ReservationModalProps> = ({ rooms: initi
       updatedAt: new Date().toISOString(),
     };
 
-    if (db.checkOverbooking(newRes)) {
+    if (await db.checkOverbooking(newRes)) {
        alert('No se pudo copiar: Overbooking detectado en el mes siguiente.');
        return;
     }
@@ -121,8 +120,8 @@ export const ReservationModal: React.FC<ReservationModalProps> = ({ rooms: initi
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden border border-gray-200">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 overflow-y-auto">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl my-auto overflow-hidden border border-gray-200">
         <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between bg-gray-50">
           <div>
             <h2 className="text-xl font-bold text-gray-800">
@@ -145,7 +144,6 @@ export const ReservationModal: React.FC<ReservationModalProps> = ({ rooms: initi
             </div>
           )}
 
-          {/* Guest Selector */}
           <div className="bg-blue-50/50 p-4 rounded-xl border border-blue-100 relative">
             <label className="block text-xs font-bold text-blue-500 uppercase mb-2">Huésped</label>
             {selectedGuest ? (
@@ -182,7 +180,7 @@ export const ReservationModal: React.FC<ReservationModalProps> = ({ rooms: initi
              <div>
               <label className="block text-xs font-bold text-gray-400 uppercase mb-1">Inmueble</label>
               <select 
-                className="w-full bg-white border border-gray-300 rounded-lg p-2.5 focus:ring-2 focus:ring-blue-500 outline-none"
+                className="w-full bg-white border border-gray-300 rounded-lg p-2.5 outline-none"
                 value={formData.propertyId}
                 onChange={e => setFormData({...formData, propertyId: e.target.value})}
               >
@@ -192,7 +190,7 @@ export const ReservationModal: React.FC<ReservationModalProps> = ({ rooms: initi
             <div>
               <label className="block text-xs font-bold text-gray-400 uppercase mb-1">Habitación</label>
               <select 
-                className="w-full bg-white border border-gray-300 rounded-lg p-2.5 focus:ring-2 focus:ring-blue-500 outline-none"
+                className="w-full bg-white border border-gray-300 rounded-lg p-2.5 outline-none"
                 value={formData.roomId}
                 onChange={e => setFormData({...formData, roomId: e.target.value})}
               >
@@ -215,26 +213,23 @@ export const ReservationModal: React.FC<ReservationModalProps> = ({ rooms: initi
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
              <div>
               <label className="block text-xs font-bold text-gray-400 uppercase mb-1">Importe Mensual (€)</label>
-              <input required type="number" className="w-full bg-white border border-gray-300 rounded-lg p-2.5 focus:ring-2 focus:ring-blue-500 outline-none" value={formData.amount} onChange={e => setFormData({...formData, amount: Number(e.target.value)})} />
+              <input required type="number" className="w-full border rounded-lg p-2.5 outline-none" value={formData.amount} onChange={e => setFormData({...formData, amount: Number(e.target.value)})} />
             </div>
             <div>
               <label className="block text-xs font-bold text-gray-400 uppercase mb-1">Método de Pago</label>
               <select 
-                className="w-full bg-white border border-gray-300 rounded-lg p-2.5 focus:ring-2 focus:ring-blue-500 outline-none"
+                className="w-full border rounded-lg p-2.5 outline-none font-bold"
                 value={formData.paymentMethod}
                 onChange={e => setFormData({...formData, paymentMethod: e.target.value as PaymentMethod})}
               >
-                <option value="transfer">Transferencia</option>
+                <option value="pending">Pendiente</option>
+                <option value="transfer">Banco</option>
                 <option value="cash">Efectivo</option>
               </select>
             </div>
             <div>
-              <label className="block text-xs font-bold text-gray-400 uppercase mb-1">Estado</label>
-              <select 
-                className="w-full bg-white border border-gray-300 rounded-lg p-2.5 focus:ring-2 focus:ring-blue-500 outline-none"
-                value={formData.status}
-                onChange={e => setFormData({...formData, status: e.target.value as ReservationStatus})}
-              >
+              <label className="block text-xs font-bold text-gray-400 uppercase mb-1">Estado Reserva</label>
+              <select className="w-full border rounded-lg p-2.5 outline-none" value={formData.status} onChange={e => setFormData({...formData, status: e.target.value as ReservationStatus})}>
                 <option value="pending">Pendiente</option>
                 <option value="confirmed">Confirmada</option>
                 <option value="checked-out">Finalizada</option>
@@ -254,7 +249,9 @@ export const ReservationModal: React.FC<ReservationModalProps> = ({ rooms: initi
             </div>
             <div className="flex space-x-3 w-full sm:w-auto">
                <button type="button" onClick={onClose} className="flex-1 px-6 py-2.5 text-gray-500 font-bold hover:bg-gray-100 rounded-lg">Cerrar</button>
-               <button type="submit" className="flex-1 px-8 py-2.5 bg-blue-600 text-white rounded-lg font-bold shadow-lg hover:bg-blue-700">Guardar</button>
+               <button type="submit" disabled={loading} className="flex-1 px-8 py-2.5 bg-blue-600 text-white rounded-lg font-bold shadow-lg hover:bg-blue-700 disabled:bg-gray-400">
+                 {loading ? 'Guardando...' : 'Guardar'}
+               </button>
             </div>
           </div>
         </form>
