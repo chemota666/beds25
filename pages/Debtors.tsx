@@ -3,15 +3,17 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { db } from '../services/db';
 import { Reservation, Property, Room, Guest } from '../types';
 
-export const Billing: React.FC = () => {
+export const Debtors: React.FC = () => {
   const [reservations, setReservations] = useState<Reservation[]>([]);
   const [properties, setProperties] = useState<Property[]>([]);
   const [rooms, setRooms] = useState<Room[]>([]);
   const [guests, setGuests] = useState<Guest[]>([]);
   const [filter, setFilter] = useState({ propertyId: '' });
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const loadData = async () => {
+      setLoading(true);
       const [resData, propsData, roomsData, guestsData] = await Promise.all([
         db.getReservations(),
         db.getProperties(),
@@ -22,22 +24,24 @@ export const Billing: React.FC = () => {
       setProperties(propsData);
       setRooms(roomsData);
       setGuests(guestsData);
+      setLoading(false);
     };
     loadData();
   }, []);
 
   const filteredData = useMemo(() => {
     return reservations.filter(r => {
-      // Solo mostramos lo COBRADO (transferencia o efectivo)
-      const isPaid = r.paymentMethod === 'transfer' || r.paymentMethod === 'cash';
-      if (!isPaid) return false;
+      // Solo mostramos lo PENDIENTE de cobro
+      // En el nuevo sistema, status no existe, rely on paymentMethod
+      const isPending = r.paymentMethod === 'pending';
+      if (!isPending) return false;
 
       const matchProp = filter.propertyId ? r.propertyId === filter.propertyId : true;
       return matchProp;
     });
   }, [reservations, filter]);
 
-  const totalBilled = filteredData.reduce((sum, r) => sum + r.amount, 0);
+  const totalPending = filteredData.reduce((sum, r) => sum + r.amount, 0);
 
   const getRoomName = (id: string) => rooms.find(r => r.id === id)?.name || 'N/A';
   const getPropertyName = (id: string) => properties.find(p => p.id === id)?.name || 'N/A';
@@ -45,42 +49,19 @@ export const Billing: React.FC = () => {
     const g = guests.find(guest => guest.id === id);
     return g ? `${g.name} ${g.surname}` : 'N/A';
   };
-
-  const formatDate = (dateStr?: string) => {
-    if (!dateStr) return '—';
-    return new Date(dateStr).toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' });
-  };
-
-  const exportCSV = () => {
-    const headers = "Número,Factura,Fecha Factura,Huésped,Inmueble,Habitación,Desde,Hasta,Importe\n";
-    const rows = filteredData.map(r => 
-      `${r.reservationNumber},${r.invoiceNumber || ''},${r.invoiceDate || ''},${getGuestName(r.guestId)},${getPropertyName(r.propertyId)},${getRoomName(r.roomId)},${r.startDate},${r.endDate},${r.amount}`
-    ).join("\n");
-    const blob = new Blob([headers + rows], { type: 'text/csv' });
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.setAttribute('hidden', '');
-    a.setAttribute('href', url);
-    a.setAttribute('download', 'facturacion_roomflow.csv');
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
+  const getGuestPhone = (id: string) => {
+    const g = guests.find(guest => guest.id === id);
+    return g?.phone || 'Sin tlf';
   };
 
   return (
     <div className="space-y-6">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900 tracking-tight">Facturación (Cobrado)</h1>
-          <p className="text-sm text-gray-500">Reservas con pago confirmado y factura emitida.</p>
+          <h1 className="text-2xl font-bold text-gray-900 tracking-tight">Reporte de Deudores</h1>
+          <p className="text-sm text-gray-500">Reservas con pago pendiente de cobro.</p>
         </div>
-        <button 
-          onClick={exportCSV}
-          className="bg-gray-800 text-white px-6 py-2.5 rounded-xl font-bold shadow-md hover:bg-black flex items-center transition-all"
-        >
-          <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
-          Exportar CSV
-        </button>
+        {loading && <span className="text-blue-600 font-bold animate-pulse text-sm">Cargando desde Sheets...</span>}
       </div>
 
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
@@ -88,7 +69,7 @@ export const Billing: React.FC = () => {
            <div>
              <label className="block text-xs font-bold text-gray-400 uppercase mb-2 tracking-wider">Filtrar por Inmueble</label>
              <select 
-               className="w-full bg-gray-50 border border-gray-200 rounded-xl p-2.5 outline-none focus:ring-4 focus:ring-blue-50/50 transition-all"
+               className="w-full bg-gray-50 border border-gray-200 rounded-xl p-2.5 outline-none focus:ring-4 focus:ring-red-50/50 transition-all"
                value={filter.propertyId}
                onChange={e => setFilter({...filter, propertyId: e.target.value})}
              >
@@ -97,13 +78,13 @@ export const Billing: React.FC = () => {
              </select>
            </div>
            
-           <div className="bg-blue-600 rounded-2xl p-4 flex items-center justify-between text-white shadow-xl shadow-blue-100">
+           <div className="bg-red-600 rounded-2xl p-4 flex items-center justify-between text-white shadow-xl shadow-red-100">
              <div>
-               <p className="text-[10px] font-black uppercase opacity-60">Ingresos Reales</p>
-               <p className="text-2xl font-black">{totalBilled.toLocaleString()}€</p>
+               <p className="text-[10px] font-black uppercase opacity-60">Importe Pendiente</p>
+               <p className="text-2xl font-black">{totalPending.toLocaleString()}€</p>
              </div>
-             <div className="bg-blue-500/30 p-2 rounded-xl">
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+             <div className="bg-red-500/30 p-2 rounded-xl">
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
              </div>
            </div>
         </div>
@@ -112,29 +93,18 @@ export const Billing: React.FC = () => {
           <table className="w-full text-left">
             <thead>
               <tr className="text-xs font-black text-gray-400 uppercase tracking-widest border-b border-gray-100">
-                <th className="pb-4 px-2"># Res</th>
-                <th className="pb-4">Factura</th>
-                <th className="pb-4">Fecha Factura</th>
+                <th className="pb-4 px-2">#</th>
                 <th className="pb-4">Huésped</th>
                 <th className="pb-4">Ubicación</th>
                 <th className="pb-4">Período</th>
-                <th className="pb-4 text-right">Importe</th>
+                <th className="pb-4">Contacto</th>
+                <th className="pb-4 text-right">Deuda</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
               {filteredData.length > 0 ? filteredData.map(r => (
-                <tr key={r.id} className="hover:bg-gray-50 transition-colors group">
-                  <td className="py-4 px-2 text-xs font-black text-blue-500">#{r.reservationNumber}</td>
-                  <td className="py-4">
-                    <span className="text-xs font-bold text-gray-500 bg-gray-100 px-2 py-1 rounded">
-                      {r.invoiceNumber || 'SIN FACTURA'}
-                    </span>
-                  </td>
-                  <td className="py-4">
-                    <span className="text-xs font-semibold text-gray-600">
-                      {formatDate(r.invoiceDate)}
-                    </span>
-                  </td>
+                <tr key={r.id} className="hover:bg-red-50/50 transition-colors group">
+                  <td className="py-4 px-2 text-xs font-black text-red-500">#{r.reservationNumber}</td>
                   <td className="py-4">
                     <div className="font-bold text-gray-800">{getGuestName(r.guestId)}</div>
                   </td>
@@ -149,11 +119,14 @@ export const Billing: React.FC = () => {
                        <span className="font-bold text-gray-700">{new Date(r.endDate).toLocaleDateString()}</span>
                     </div>
                   </td>
-                  <td className="py-4 text-right font-black text-gray-900 group-hover:text-blue-600 transition-colors">{r.amount.toLocaleString()}€</td>
+                  <td className="py-4">
+                    <div className="text-sm text-gray-600">{getGuestPhone(r.guestId)}</div>
+                  </td>
+                  <td className="py-4 text-right font-black text-red-600">{r.amount.toLocaleString()}€</td>
                 </tr>
               )) : (
                 <tr>
-                  <td colSpan={7} className="py-16 text-center text-gray-400 italic">No hay cobros confirmados para mostrar.</td>
+                  <td colSpan={6} className="py-16 text-center text-gray-400 italic">No hay deudas pendientes en este momento.</td>
                 </tr>
               )}
             </tbody>

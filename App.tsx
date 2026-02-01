@@ -1,25 +1,15 @@
 
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { HashRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { Layout } from './components/Layout';
 import { Dashboard } from './pages/Dashboard';
 import { Guests } from './pages/Guests';
 import { Properties } from './pages/Properties';
 import { Billing } from './pages/Billing';
-import { Login } from './pages/Login';
-import { db } from './services/db';
+import { Debtors } from './pages/Debtors';
 
 const App: React.FC = () => {
-  const [isLoggedIn, setIsLoggedIn] = useState(!!db.getAuthUser());
-
-  const handleLoginSuccess = () => {
-    setIsLoggedIn(true);
-  };
-
-  if (!isLoggedIn) {
-    return <Login onLogin={handleLoginSuccess} />;
-  }
-
+  // Login deshabilitado temporalmente: cargamos directamente el Router
   return (
     <Router>
       <Layout>
@@ -28,6 +18,7 @@ const App: React.FC = () => {
           <Route path="/guests" element={<Guests />} />
           <Route path="/properties" element={<Properties />} />
           <Route path="/billing" element={<Billing />} />
+          <Route path="/debtors" element={<Debtors />} />
           <Route path="*" element={<Navigate to="/" />} />
         </Routes>
       </Layout>

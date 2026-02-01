@@ -93,7 +93,8 @@ export const Dashboard: React.FC = () => {
     const today = new Date();
     const start = new Date(r.startDate);
     const end = new Date(r.endDate);
-    return today >= start && today <= end && r.status === 'confirmed';
+    // Removed the non-existent 'status' check as the database logic now assumes presence means confirmed.
+    return today >= start && today <= end;
   }).length;
 
   const occupancy = activeRoomsCount > 0 ? Math.round((currentOccupied / activeRoomsCount) * 100) : 0;

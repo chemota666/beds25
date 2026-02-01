@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { Room, Reservation, Guest, Property, PaymentMethod, ReservationStatus } from '../types';
+import { Room, Reservation, Guest, Property, PaymentMethod } from '../types';
 import { db } from '../services/db';
 
 interface ReservationModalProps {
@@ -31,7 +31,6 @@ export const ReservationModal: React.FC<ReservationModalProps> = ({ rooms: initi
       startDate: initialData?.date || new Date().toISOString().split('T')[0],
       endDate: initialData?.date || new Date().toISOString().split('T')[0],
       paymentMethod: 'pending',
-      status: 'confirmed',
       notes: '',
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
@@ -48,7 +47,6 @@ export const ReservationModal: React.FC<ReservationModalProps> = ({ rooms: initi
   }, []);
 
   const availableRooms = useMemo(() => {
-    // Nota: db.getRooms es async, pero aquí lo manejamos con rooms que ya tenemos o consultamos el estado si cambia prop
     return initialRooms.filter(r => r.propertyId === formData.propertyId);
   }, [formData.propertyId, initialRooms]);
 
@@ -108,6 +106,7 @@ export const ReservationModal: React.FC<ReservationModalProps> = ({ rooms: initi
       endDate: nextEnd.toISOString().split('T')[0],
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
+      invoiceNumber: '', // Clear invoice for copies
     };
 
     if (await db.checkOverbooking(newRes)) {
@@ -210,7 +209,7 @@ export const ReservationModal: React.FC<ReservationModalProps> = ({ rooms: initi
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
              <div>
               <label className="block text-xs font-bold text-gray-400 uppercase mb-1">Importe Mensual (€)</label>
               <input required type="number" className="w-full border rounded-lg p-2.5 outline-none" value={formData.amount} onChange={e => setFormData({...formData, amount: Number(e.target.value)})} />
@@ -222,18 +221,9 @@ export const ReservationModal: React.FC<ReservationModalProps> = ({ rooms: initi
                 value={formData.paymentMethod}
                 onChange={e => setFormData({...formData, paymentMethod: e.target.value as PaymentMethod})}
               >
-                <option value="pending">Pendiente</option>
-                <option value="transfer">Banco</option>
-                <option value="cash">Efectivo</option>
-              </select>
-            </div>
-            <div>
-              <label className="block text-xs font-bold text-gray-400 uppercase mb-1">Estado Reserva</label>
-              <select className="w-full border rounded-lg p-2.5 outline-none" value={formData.status} onChange={e => setFormData({...formData, status: e.target.value as ReservationStatus})}>
-                <option value="pending">Pendiente</option>
-                <option value="confirmed">Confirmada</option>
-                <option value="checked-out">Finalizada</option>
-                <option value="cancelled">Cancelada</option>
+                <option value="pending">Pendiente (No pagado)</option>
+                <option value="transfer">Banco (Pagado)</option>
+                <option value="cash">Efectivo (Pagado)</option>
               </select>
             </div>
           </div>

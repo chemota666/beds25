@@ -1,5 +1,5 @@
 
-import { Property, Room, Reservation, Guest } from '../types';
+import { Property, Room, Reservation, Guest, Invoice } from '../types';
 import { sheetsApi } from './sheetsApi';
 
 const KEYS = {
@@ -8,6 +8,7 @@ const KEYS = {
   RESERVATIONS: 'roomflow_reservations',
   GUESTS: 'roomflow_guests',
   LAST_RES_NUMBER: 'roomflow_last_res_number',
+  LAST_INV_NUMBER: 'roomflow_last_inv_number',
   AUTH_USER: 'roomflow_auth_user'
 };
 
@@ -15,7 +16,6 @@ export const db = {
   getProperties: async (): Promise<Property[]> => {
     const data = await sheetsApi.fetchSheet('properties');
     if (data.length === 0) {
-      // Si el sheet está vacío, intentamos cargar de local o usar iniciales
       const local = localStorage.getItem(KEYS.PROPERTIES);
       return local ? JSON.parse(local) : [];
     }
@@ -23,15 +23,24 @@ export const db = {
   },
   
   saveProperty: async (prop: Property) => {
-    // Primero en local para feedback instantáneo
+    const currentUser = db.getAuthUser() || 'system';
     const props = await db.getProperties();
+    const existing = props.find(p => p.id === prop.id);
+    
+    const now = new Date().toISOString();
+    const dataToSave: Property = {
+      ...prop,
+      updatedAt: now,
+      updatedBy: currentUser,
+      createdAt: existing ? (existing.createdAt || now) : now,
+      createdBy: existing ? (existing.createdBy || currentUser) : currentUser
+    };
+
     const index = props.findIndex(p => p.id === prop.id);
-    const action = index >= 0 ? 'update' : 'append';
-    if (index >= 0) props[index] = prop; else props.push(prop);
+    if (index >= 0) props[index] = dataToSave; else props.push(dataToSave);
     localStorage.setItem(KEYS.PROPERTIES, JSON.stringify(props));
     
-    // Luego al Sheet
-    await sheetsApi.postAction('properties', action, prop, prop.id);
+    await sheetsApi.postAction('properties', existing ? 'update' : 'append', dataToSave, dataToSave.id);
   },
 
   getRooms: async (propertyId?: string): Promise<Room[]> => {
@@ -54,13 +63,42 @@ export const db = {
   },
 
   saveGuest: async (guest: Guest) => {
+    const currentUser = db.getAuthUser() || 'system';
     const guests = await db.getGuests();
-    const index = guests.findIndex(g => g.id === guest.id);
-    const action = index >= 0 ? 'update' : 'append';
-    if (index >= 0) guests[index] = guest; else guests.push(guest);
-    localStorage.setItem(KEYS.GUESTS, JSON.stringify(guests));
     
-    await sheetsApi.postAction('guests', action, guest, guest.id);
+    const isNew = !guests.some(g => g.id === guest.id) || guest.id.startsWith('temp_');
+    const existing = guests.find(g => g.id === guest.id);
+    
+    let finalId = guest.id;
+
+    if (isNew) {
+      // Calculate strictly numeric next ID
+      const maxId = guests.reduce((max, g) => {
+        const numericPart = parseInt(g.id.toString().replace(/\D/g, '')) || 0;
+        return Math.max(max, numericPart);
+      }, 0);
+      finalId = (maxId + 1).toString();
+    }
+    
+    const now = new Date().toISOString();
+    const dataToSave: Guest = {
+      ...guest,
+      id: finalId,
+      updatedAt: now,
+      updatedBy: currentUser,
+      createdAt: existing ? (existing.createdAt || now) : now,
+      createdBy: existing ? (existing.createdBy || currentUser) : currentUser
+    };
+
+    if (!isNew) {
+      const index = guests.findIndex(g => g.id === guest.id);
+      if (index >= 0) guests[index] = dataToSave;
+    } else {
+      guests.push(dataToSave);
+    }
+
+    localStorage.setItem(KEYS.GUESTS, JSON.stringify(guests));
+    await sheetsApi.postAction('guests', isNew ? 'append' : 'update', dataToSave, dataToSave.id);
   },
 
   deleteGuest: async (id: string) => {
@@ -86,8 +124,6 @@ export const db = {
     return reservations.some(res => {
       if (res.id === newRes.id) return false;
       if (res.roomId !== newRes.roomId) return false;
-      if (res.status === 'cancelled') return false;
-
       const resStart = new Date(res.startDate).getTime();
       const resEnd = new Date(res.endDate).getTime();
       return start < resEnd && end > resStart;
@@ -95,21 +131,74 @@ export const db = {
   },
 
   saveReservation: async (res: Reservation) => {
+    const currentUser = db.getAuthUser() || 'system';
     const reservations = await db.getReservations();
-    const index = reservations.findIndex(r => r.id === res.id);
-    const action = index >= 0 ? 'update' : 'append';
+    const existing = reservations.find(r => r.id === res.id);
     
-    if (index >= 0) {
-      reservations[index] = res;
-    } else {
+    const now = new Date().toISOString();
+    const today = now.split('T')[0];
+    
+    let reservationNumber = res.reservationNumber;
+    let invoiceNumber = res.invoiceNumber;
+    let invoiceDate = res.invoiceDate;
+    
+    if (!existing) {
       let lastNumber = Number(localStorage.getItem(KEYS.LAST_RES_NUMBER) || '1002');
       lastNumber++;
-      res.reservationNumber = lastNumber;
+      reservationNumber = lastNumber;
       localStorage.setItem(KEYS.LAST_RES_NUMBER, lastNumber.toString());
-      reservations.push(res);
+    }
+
+    const isPaid = res.paymentMethod === 'cash' || res.paymentMethod === 'transfer';
+    const wasPaid = existing ? (existing.paymentMethod === 'cash' || existing.paymentMethod === 'transfer') : false;
+
+    // Lógica automática de Fecha de Factura e Invoice Number
+    if (isPaid && !wasPaid) {
+      // Transición a PAGADO
+      if (!invoiceDate) {
+        invoiceDate = today;
+      }
+      
+      if (!invoiceNumber) {
+        let lastInv = Number(localStorage.getItem(KEYS.LAST_INV_NUMBER) || '0');
+        lastInv++;
+        const currentYear = new Date().getFullYear();
+        invoiceNumber = `FAC-${currentYear}-${lastInv.toString().padStart(3, '0')}`;
+        localStorage.setItem(KEYS.LAST_INV_NUMBER, lastInv.toString());
+        
+        const invoiceData: Invoice = {
+          id: Math.random().toString(36).substr(2, 9),
+          number: invoiceNumber,
+          reservationId: res.id,
+          createdAt: now
+        };
+        await sheetsApi.postAction('invoices', 'append', invoiceData);
+      }
+    } else if (!isPaid && wasPaid) {
+      // Transición a PENDIENTE
+      invoiceNumber = '';
+      invoiceDate = '';
+    }
+
+    const dataToSave: Reservation = {
+      ...res,
+      reservationNumber,
+      invoiceNumber,
+      invoiceDate,
+      updatedAt: now,
+      updatedBy: currentUser,
+      createdAt: existing ? (existing.createdAt || now) : now,
+      createdBy: existing ? (existing.createdBy || currentUser) : currentUser
+    };
+
+    const index = reservations.findIndex(r => r.id === res.id);
+    if (index >= 0) {
+      reservations[index] = dataToSave;
+    } else {
+      reservations.push(dataToSave);
     }
     localStorage.setItem(KEYS.RESERVATIONS, JSON.stringify(reservations));
-    await sheetsApi.postAction('reservations', action, res, res.id);
+    await sheetsApi.postAction('reservations', existing ? 'update' : 'append', dataToSave, dataToSave.id);
   },
 
   deleteReservation: async (id: string) => {
@@ -122,7 +211,6 @@ export const db = {
     const props = (await db.getProperties()).filter(p => p.id !== id);
     localStorage.setItem(KEYS.PROPERTIES, JSON.stringify(props));
     await sheetsApi.postAction('properties', 'delete', {}, id);
-    // Nota: Las habitaciones y reservas asociadas deberían borrarse también en una implementación completa
   },
 
   setAuthUser: (username: string | null) => {
@@ -131,6 +219,7 @@ export const db = {
   },
 
   getAuthUser: (): string | null => {
-    return localStorage.getItem(KEYS.AUTH_USER);
+    // Para deshabilitar login temporalmente, devolvemos 'chema' si no hay usuario
+    return localStorage.getItem(KEYS.AUTH_USER) || 'chema';
   }
 };
