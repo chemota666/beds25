@@ -1,0 +1,5 @@
+{
+  "name": "RoomFlow PMS",
+  "description": "A high-performance Property Management System for mid-term room rentals, featuring an interactive timeline calendar, property management, and billing analytics.",
+  "requestFramePermissions": []
+}

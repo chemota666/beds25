@@ -1,0 +1,158 @@
+
+import React, { useState, useEffect, useMemo } from 'react';
+import { db } from '../services/db';
+import { Reservation, Property, Room, Guest } from '../types';
+
+export const Billing: React.FC = () => {
+  const [reservations, setReservations] = useState<Reservation[]>([]);
+  const [properties, setProperties] = useState<Property[]>([]);
+  const [rooms, setRooms] = useState<Room[]>([]);
+  const [guests, setGuests] = useState<Guest[]>([]);
+  const [filter, setFilter] = useState({ propertyId: '', status: '' });
+
+  useEffect(() => {
+    setReservations(db.getReservations());
+    setProperties(db.getProperties());
+    setRooms(db.getRooms());
+    setGuests(db.getGuests());
+  }, []);
+
+  const filteredData = useMemo(() => {
+    return reservations.filter(r => {
+      const matchProp = filter.propertyId ? r.propertyId === filter.propertyId : true;
+      const matchStatus = filter.status ? r.status === filter.status : true;
+      return matchProp && matchStatus;
+    });
+  }, [reservations, filter]);
+
+  const totalBilled = filteredData.reduce((sum, r) => sum + r.amount, 0);
+
+  const getRoomName = (id: string) => rooms.find(r => r.id === id)?.name || 'N/A';
+  const getPropertyName = (id: string) => properties.find(p => p.id === id)?.name || 'N/A';
+  const getGuestName = (id: string) => {
+    const g = guests.find(guest => guest.id === id);
+    return g ? `${g.name} ${g.surname}` : 'N/A';
+  };
+
+  const exportCSV = () => {
+    const headers = "Número,Huésped,Inmueble,Habitación,Desde,Hasta,Estado,Importe\n";
+    const rows = filteredData.map(r => 
+      `${r.reservationNumber},${getGuestName(r.guestId)},${getPropertyName(r.propertyId)},${getRoomName(r.roomId)},${r.startDate},${r.endDate},${r.status},${r.amount}`
+    ).join("\n");
+    const blob = new Blob([headers + rows], { type: 'text/csv' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.setAttribute('hidden', '');
+    a.setAttribute('href', url);
+    a.setAttribute('download', 'facturacion_roomflow.csv');
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900 tracking-tight">Facturación y Cobros</h1>
+          <p className="text-sm text-gray-500">Visualiza los ingresos por reserva y exporta informes detallados.</p>
+        </div>
+        <button 
+          onClick={exportCSV}
+          className="bg-gray-800 text-white px-6 py-2.5 rounded-xl font-bold shadow-md hover:bg-black flex items-center transition-all"
+        >
+          <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+          Exportar CSV
+        </button>
+      </div>
+
+      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+           <div>
+             <label className="block text-xs font-bold text-gray-400 uppercase mb-2 tracking-wider">Filtrar por Inmueble</label>
+             <select 
+               className="w-full bg-gray-50 border border-gray-200 rounded-xl p-2.5 outline-none focus:ring-4 focus:ring-blue-50/50 transition-all"
+               value={filter.propertyId}
+               onChange={e => setFilter({...filter, propertyId: e.target.value})}
+             >
+               <option value="">Todos los inmuebles</option>
+               {properties.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+             </select>
+           </div>
+           <div>
+             <label className="block text-xs font-bold text-gray-400 uppercase mb-2 tracking-wider">Filtrar por Estado</label>
+             <select 
+               className="w-full bg-gray-50 border border-gray-200 rounded-xl p-2.5 outline-none focus:ring-4 focus:ring-blue-50/50 transition-all"
+               value={filter.status}
+               onChange={e => setFilter({...filter, status: e.target.value})}
+             >
+               <option value="">Todos los estados</option>
+               <option value="confirmed">Confirmada</option>
+               <option value="pending">Pendiente</option>
+               <option value="checked-out">Finalizada</option>
+             </select>
+           </div>
+           <div className="bg-blue-600 rounded-2xl p-4 flex items-center justify-between text-white shadow-xl shadow-blue-100">
+             <div>
+               <p className="text-[10px] font-black uppercase opacity-60">Total Facturado</p>
+               <p className="text-2xl font-black">{totalBilled.toLocaleString()}€</p>
+             </div>
+             <div className="bg-blue-500/30 p-2 rounded-xl">
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+             </div>
+           </div>
+        </div>
+
+        <div className="overflow-x-auto">
+          <table className="w-full text-left">
+            <thead>
+              <tr className="text-xs font-black text-gray-400 uppercase tracking-widest border-b border-gray-100">
+                <th className="pb-4 px-2">#</th>
+                <th className="pb-4">Huésped</th>
+                <th className="pb-4">Ubicación</th>
+                <th className="pb-4">Período</th>
+                <th className="pb-4">Estado</th>
+                <th className="pb-4 text-right">Importe</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-50">
+              {filteredData.length > 0 ? filteredData.map(r => (
+                <tr key={r.id} className="hover:bg-gray-50 transition-colors group">
+                  <td className="py-4 px-2 text-xs font-black text-blue-500">#{r.reservationNumber}</td>
+                  <td className="py-4">
+                    <div className="font-bold text-gray-800">{getGuestName(r.guestId)}</div>
+                  </td>
+                  <td className="py-4">
+                    <div className="text-sm font-medium text-gray-600">{getPropertyName(r.propertyId)}</div>
+                    <div className="text-[10px] font-bold text-gray-400 uppercase">{getRoomName(r.roomId)}</div>
+                  </td>
+                  <td className="py-4 text-sm text-gray-500">
+                    <div className="flex items-center space-x-2">
+                       <span className="font-bold text-gray-700">{new Date(r.startDate).toLocaleDateString()}</span>
+                       <span className="text-gray-300">→</span>
+                       <span className="font-bold text-gray-700">{new Date(r.endDate).toLocaleDateString()}</span>
+                    </div>
+                  </td>
+                  <td className="py-4">
+                    <span className={`px-2 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider ${
+                      r.status === 'confirmed' ? 'bg-green-100 text-green-700 border border-green-200' : 
+                      r.status === 'pending' ? 'bg-yellow-100 text-yellow-700 border border-yellow-200' : 
+                      r.status === 'cancelled' ? 'bg-red-100 text-red-700 border border-red-200' : 'bg-blue-100 text-blue-700 border border-blue-200'
+                    }`}>
+                      {r.status}
+                    </span>
+                  </td>
+                  <td className="py-4 text-right font-black text-gray-900 group-hover:text-blue-600 transition-colors">{r.amount.toLocaleString()}€</td>
+                </tr>
+              )) : (
+                <tr>
+                  <td colSpan={6} className="py-16 text-center text-gray-400 italic">No hay registros financieros que coincidan con los filtros.</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+};
