@@ -24,7 +24,7 @@ export const db = {
   },
 
   saveProperty: async (prop: Property) => {
-    const isNumericId = prop.id && /^[0-9]+$/.test(String(prop.id)); if (isNumericId) {
+    if (prop.id) {
       await mysqlApi.updateData('properties', String(prop.id), prop);
     } else {
       await mysqlApi.insertData('properties', prop);
