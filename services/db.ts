@@ -1,6 +1,5 @@
-
 import { Property, Room, Reservation, Guest, Invoice } from '../types';
-import { sheetsApi } from './sheetsApi';
+import { mysqlApi } from './mysqlApi';
 
 const KEYS = {
   PROPERTIES: 'roomflow_properties',
@@ -14,106 +13,90 @@ const KEYS = {
 
 export const db = {
   getProperties: async (): Promise<Property[]> => {
-    const data = await sheetsApi.fetchSheet('properties');
-    if (data.length === 0) {
+    try {
+      const data = await mysqlApi.fetchData('properties');
+      localStorage.setItem(KEYS.PROPERTIES, JSON.stringify(data));
+      return data;
+    } catch (error) {
       const local = localStorage.getItem(KEYS.PROPERTIES);
       return local ? JSON.parse(local) : [];
     }
-    return data;
   },
-  
-  saveProperty: async (prop: Property) => {
-    const currentUser = db.getAuthUser() || 'system';
-    const props = await db.getProperties();
-    const existing = props.find(p => p.id === prop.id);
-    
-    const now = new Date().toISOString();
-    const dataToSave: Property = {
-      ...prop,
-      updatedAt: now,
-      updatedBy: currentUser,
-      createdAt: existing ? (existing.createdAt || now) : now,
-      createdBy: existing ? (existing.createdBy || currentUser) : currentUser
-    };
 
-    const index = props.findIndex(p => p.id === prop.id);
-    if (index >= 0) props[index] = dataToSave; else props.push(dataToSave);
-    localStorage.setItem(KEYS.PROPERTIES, JSON.stringify(props));
-    
-    await sheetsApi.postAction('properties', existing ? 'update' : 'append', dataToSave, dataToSave.id);
+  saveProperty: async (prop: Property) => {
+    if (prop.id) {
+      await mysqlApi.updateData('properties', String(prop.id), prop);
+    } else {
+      await mysqlApi.insertData('properties', prop);
+    }
+  },
+
+  deleteProperty: async (id: string) => {
+    await mysqlApi.deleteData('properties', id);
   },
 
   getRooms: async (propertyId?: string): Promise<Room[]> => {
-    const data = await sheetsApi.fetchSheet('rooms');
-    let rooms: Room[] = data;
-    if (data.length === 0) {
+    try {
+      const data = await mysqlApi.fetchData('rooms');
+      localStorage.setItem(KEYS.ROOMS, JSON.stringify(data));
+      if (propertyId) {
+        return data.filter((r: Room) => String(r.propertyId) === String(propertyId));
+      }
+      return data;
+    } catch (error) {
       const local = localStorage.getItem(KEYS.ROOMS);
-      rooms = local ? JSON.parse(local) : [];
+      const rooms = local ? JSON.parse(local) : [];
+      if (propertyId) {
+        return rooms.filter((r: Room) => String(r.propertyId) === String(propertyId));
+      }
+      return rooms;
     }
-    return propertyId ? rooms.filter(r => r.propertyId === propertyId) : rooms;
-  },
-
-  getGuests: async (): Promise<Guest[]> => {
-    const data = await sheetsApi.fetchSheet('guests');
-    if (data.length === 0) {
-      const local = localStorage.getItem(KEYS.GUESTS);
-      return local ? JSON.parse(local) : [];
-    }
-    return data;
-  },
-
-  saveGuest: async (guest: Guest) => {
-    const currentUser = db.getAuthUser() || 'system';
-    const guests = await db.getGuests();
-    
-    const isNew = !guests.some(g => g.id === guest.id) || guest.id.startsWith('temp_');
-    const existing = guests.find(g => g.id === guest.id);
-    
-    let finalId = guest.id;
-
-    if (isNew) {
-      // Calculate strictly numeric next ID
-      const maxId = guests.reduce((max, g) => {
-        const numericPart = parseInt(g.id.toString().replace(/\D/g, '')) || 0;
-        return Math.max(max, numericPart);
-      }, 0);
-      finalId = (maxId + 1).toString();
-    }
-    
-    const now = new Date().toISOString();
-    const dataToSave: Guest = {
-      ...guest,
-      id: finalId,
-      updatedAt: now,
-      updatedBy: currentUser,
-      createdAt: existing ? (existing.createdAt || now) : now,
-      createdBy: existing ? (existing.createdBy || currentUser) : currentUser
-    };
-
-    if (!isNew) {
-      const index = guests.findIndex(g => g.id === guest.id);
-      if (index >= 0) guests[index] = dataToSave;
-    } else {
-      guests.push(dataToSave);
-    }
-
-    localStorage.setItem(KEYS.GUESTS, JSON.stringify(guests));
-    await sheetsApi.postAction('guests', isNew ? 'append' : 'update', dataToSave, dataToSave.id);
-  },
-
-  deleteGuest: async (id: string) => {
-    const guests = (await db.getGuests()).filter(g => g.id !== id);
-    localStorage.setItem(KEYS.GUESTS, JSON.stringify(guests));
-    await sheetsApi.postAction('guests', 'delete', {}, id);
   },
 
   getReservations: async (): Promise<Reservation[]> => {
-    const data = await sheetsApi.fetchSheet('reservations');
-    if (data.length === 0) {
+    try {
+      const data = await mysqlApi.fetchData('reservations');
+      localStorage.setItem(KEYS.RESERVATIONS, JSON.stringify(data));
+      return data;
+    } catch (error) {
       const local = localStorage.getItem(KEYS.RESERVATIONS);
       return local ? JSON.parse(local) : [];
     }
-    return data;
+  },
+
+  saveReservation: async (res: Reservation) => {
+    if (res.id && !String(res.id).startsWith('temp_')) {
+      await mysqlApi.updateData('reservations', String(res.id), res);
+    } else {
+      await mysqlApi.insertData('reservations', res);
+    }
+  },
+
+  deleteReservation: async (id: string) => {
+    await mysqlApi.deleteData('reservations', id);
+  },
+
+  getGuests: async (): Promise<Guest[]> => {
+    try {
+      const data = await mysqlApi.fetchData('guests');
+      localStorage.setItem(KEYS.GUESTS, JSON.stringify(data));
+      return data;
+    } catch (error) {
+      const local = localStorage.getItem(KEYS.GUESTS);
+      return local ? JSON.parse(local) : [];
+    }
+  },
+
+  saveGuest: async (guest: Guest) => {
+    if (guest.id && !String(guest.id).startsWith('temp_')) {
+      await mysqlApi.updateData('guests', String(guest.id), guest);
+    } else {
+      await mysqlApi.insertData('guests', guest);
+    }
+  },
+
+  deleteGuest: async (id: string) => {
+    await mysqlApi.deleteData('guests', id);
   },
 
   checkOverbooking: async (newRes: Reservation): Promise<boolean> => {
@@ -130,87 +113,8 @@ export const db = {
     });
   },
 
-  saveReservation: async (res: Reservation) => {
-    const currentUser = db.getAuthUser() || 'system';
-    const reservations = await db.getReservations();
-    const existing = reservations.find(r => r.id === res.id);
-    
-    const now = new Date().toISOString();
-    const today = now.split('T')[0];
-    
-    let reservationNumber = res.reservationNumber;
-    let invoiceNumber = res.invoiceNumber;
-    let invoiceDate = res.invoiceDate;
-    
-    if (!existing) {
-      let lastNumber = Number(localStorage.getItem(KEYS.LAST_RES_NUMBER) || '1002');
-      lastNumber++;
-      reservationNumber = lastNumber;
-      localStorage.setItem(KEYS.LAST_RES_NUMBER, lastNumber.toString());
-    }
-
-    const isPaid = res.paymentMethod === 'cash' || res.paymentMethod === 'transfer';
-    const wasPaid = existing ? (existing.paymentMethod === 'cash' || existing.paymentMethod === 'transfer') : false;
-
-    // Lógica automática de Fecha de Factura e Invoice Number
-    if (isPaid && !wasPaid) {
-      // Transición a PAGADO
-      if (!invoiceDate) {
-        invoiceDate = today;
-      }
-      
-      if (!invoiceNumber) {
-        let lastInv = Number(localStorage.getItem(KEYS.LAST_INV_NUMBER) || '0');
-        lastInv++;
-        const currentYear = new Date().getFullYear();
-        invoiceNumber = `FAC-${currentYear}-${lastInv.toString().padStart(3, '0')}`;
-        localStorage.setItem(KEYS.LAST_INV_NUMBER, lastInv.toString());
-        
-        const invoiceData: Invoice = {
-          id: Math.random().toString(36).substr(2, 9),
-          number: invoiceNumber,
-          reservationId: res.id,
-          createdAt: now
-        };
-        await sheetsApi.postAction('invoices', 'append', invoiceData);
-      }
-    } else if (!isPaid && wasPaid) {
-      // Transición a PENDIENTE
-      invoiceNumber = '';
-      invoiceDate = '';
-    }
-
-    const dataToSave: Reservation = {
-      ...res,
-      reservationNumber,
-      invoiceNumber,
-      invoiceDate,
-      updatedAt: now,
-      updatedBy: currentUser,
-      createdAt: existing ? (existing.createdAt || now) : now,
-      createdBy: existing ? (existing.createdBy || currentUser) : currentUser
-    };
-
-    const index = reservations.findIndex(r => r.id === res.id);
-    if (index >= 0) {
-      reservations[index] = dataToSave;
-    } else {
-      reservations.push(dataToSave);
-    }
-    localStorage.setItem(KEYS.RESERVATIONS, JSON.stringify(reservations));
-    await sheetsApi.postAction('reservations', existing ? 'update' : 'append', dataToSave, dataToSave.id);
-  },
-
-  deleteReservation: async (id: string) => {
-    const reservations = (await db.getReservations()).filter(r => r.id !== id);
-    localStorage.setItem(KEYS.RESERVATIONS, JSON.stringify(reservations));
-    await sheetsApi.postAction('reservations', 'delete', {}, id);
-  },
-
-  deleteProperty: async (id: string) => {
-    const props = (await db.getProperties()).filter(p => p.id !== id);
-    localStorage.setItem(KEYS.PROPERTIES, JSON.stringify(props));
-    await sheetsApi.postAction('properties', 'delete', {}, id);
+  getAuthUser: (): string | null => {
+    return localStorage.getItem(KEYS.AUTH_USER);
   },
 
   setAuthUser: (username: string | null) => {
@@ -218,8 +122,7 @@ export const db = {
     else localStorage.removeItem(KEYS.AUTH_USER);
   },
 
-  getAuthUser: (): string | null => {
-    // Para deshabilitar login temporalmente, devolvemos 'chema' si no hay usuario
-    return localStorage.getItem(KEYS.AUTH_USER) || 'chema';
-  }
+  getInvoices: async (): Promise<Invoice[]> => [],
+  saveInvoice: async (inv: Invoice) => {},
+  deleteInvoice: async (id: string) => {}
 };

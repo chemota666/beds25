@@ -9,9 +9,12 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "react-router-dom": "^7.13.0",
+    "cors": "^2.8.6",
+    "express": "^5.2.1",
+    "mysql2": "^3.16.2",
+    "react": "^19.2.4",
     "react-dom": "^19.2.4",
-    "react": "^19.2.4"
+    "react-router-dom": "^7.13.0"
   },
   "devDependencies": {
     "@types/node": "^22.14.0",
