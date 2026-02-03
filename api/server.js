@@ -10,7 +10,7 @@ const pool = mysql.createPool({
   host: '127.0.0.1',
   user: 'roomflow',
   password: 'roomflow123',
-  database: 'roomflow_pms',
+  database: 'roomflow_staging',
   waitForConnections: true,
   connectionLimit: 10
 });
@@ -71,6 +71,6 @@ app.delete('/:table/:id', async (req, res) => {
   }
 });
 
-app.listen(3001, '127.0.0.1', () => {
-  console.log('API server running on port 3001');
+app.listen(3002, '127.0.0.1', () => {
+  console.log('API server running on port 3002');
 });
