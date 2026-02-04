@@ -74,7 +74,7 @@ export const Guests: React.FC = () => {
     }
   };
 
-  const isNewGuest = editingGuest && String(editingGuest.id).startsWith('temp_');
+  const isNewGuest = editingGuest && editingGuest.id.startsWith('temp_');
 
   return (
     <div className="space-y-6">
