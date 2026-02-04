@@ -197,22 +197,22 @@ export const Guests: React.FC = () => {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-8">
                   <div className="space-y-1">
                     <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Nombre</label>
-                    <input required type="text" className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3 font-bold text-gray-800 focus:ring-4 focus:ring-blue-50 outline-none transition-all" value={editingGuest.name} onChange={e => setEditingGuest({...editingGuest, name: e.target.value})} />
+                    <input required type="text" className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3 font-bold text-gray-800 focus:ring-4 focus:ring-blue-50 outline-none transition-all" value={editingGuest.name || ""} onChange={e => setEditingGuest({...editingGuest, name: e.target.value})} />
                   </div>
                   <div className="space-y-1">
                     <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Apellidos</label>
-                    <input required type="text" className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3 font-bold text-gray-800 focus:ring-4 focus:ring-blue-50 outline-none transition-all" value={editingGuest.surname} onChange={e => setEditingGuest({...editingGuest, surname: e.target.value})} />
+                    <input required type="text" className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3 font-bold text-gray-800 focus:ring-4 focus:ring-blue-50 outline-none transition-all" value={editingGuest.surname || ""} onChange={e => setEditingGuest({...editingGuest, surname: e.target.value})} />
                   </div>
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
                   <div className="space-y-1">
                     <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">DNI / NIE</label>
-                    <input required type="text" className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3 font-bold text-gray-800 focus:ring-4 focus:ring-blue-50 outline-none transition-all" value={editingGuest.dni} onChange={e => setEditingGuest({...editingGuest, dni: e.target.value})} />
+                    <input required type="text" className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3 font-bold text-gray-800 focus:ring-4 focus:ring-blue-50 outline-none transition-all" value={editingGuest.dni || ""} onChange={e => setEditingGuest({...editingGuest, dni: e.target.value})} />
                   </div>
                   <div className="space-y-1">
                     <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Sexo</label>
-                    <select className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3 font-bold text-gray-800 focus:ring-4 focus:ring-blue-50 outline-none transition-all" value={editingGuest.sex} onChange={e => setEditingGuest({...editingGuest, sex: e.target.value as Sex})}>
+                    <select className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3 font-bold text-gray-800 focus:ring-4 focus:ring-blue-50 outline-none transition-all" value={editingGuest.sex || ""} onChange={e => setEditingGuest({...editingGuest, sex: e.target.value as Sex})}>
                       <option value="Masculino">Masculino</option>
                       <option value="Femenino">Femenino</option>
                       <option value="Otro">Otro</option>
@@ -220,7 +220,7 @@ export const Guests: React.FC = () => {
                   </div>
                   <div className="space-y-1">
                     <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Nacionalidad</label>
-                    <input required type="text" className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3 font-bold text-gray-800 focus:ring-4 focus:ring-blue-50 outline-none transition-all" value={editingGuest.nationality} onChange={e => setEditingGuest({...editingGuest, nationality: e.target.value})} />
+                    <input required type="text" className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3 font-bold text-gray-800 focus:ring-4 focus:ring-blue-50 outline-none transition-all" value={editingGuest.nationality || ""} onChange={e => setEditingGuest({...editingGuest, nationality: e.target.value})} />
                   </div>
                 </div>
 
@@ -241,7 +241,7 @@ export const Guests: React.FC = () => {
                       type="checkbox" 
                       id="empadronado"
                       className="w-5 h-5 text-blue-900 rounded focus:ring-offset-0 focus:ring-0 border-none cursor-pointer" 
-                      checked={editingGuest.isRegistered} 
+                      checked={editingGuest.isRegistered === '1' || editingGuest.isRegistered === 1} 
                       onChange={e => setEditingGuest({...editingGuest, isRegistered: e.target.checked})} 
                     />
                    </div>
