@@ -195,9 +195,9 @@ app.listen(3003, '127.0.0.1', () => {
 // ============================================
 // ENDPOINTS CRUD - CONECTAR SERVICIOS
 // ============================================
-const { OwnersService } = require('./services/ownersService.ts');
-const { PropertiesService } = require('./services/propertiesService.ts');
-const { InvoicesService } = require('./services/invoicesService.ts');
+const { OwnersService } = require('./services/ownersService.js');
+const { PropertiesService } = require('./services/propertiesService.js');
+const { InvoicesService } = require('./services/invoicesService.js');
 
 // Inicializar servicios
 const ownersService = new OwnersService(proxyPool);
