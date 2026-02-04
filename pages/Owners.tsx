@@ -13,14 +13,22 @@ export const Owners: React.FC = () => {
   }, []);
 
   const loadOwners = async () => {
-    const data = await db.getOwners();
+    // Load via REST API
+    const response = await fetch('http://n8n-contabo.ddns.net:3003/api/owners');
+    const data = await response.json();
     setOwners(data);
   };
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (editingOwner) {
-      await db.saveOwner(editingOwner);
+      // Save via REST API
+      const response = await fetch('http://n8n-contabo.ddns.net:3003/api/owners', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(editingOwner)
+      });
+      if (!response.ok) throw new Error('Error saving owner');
       await loadOwners();
       setIsModalOpen(false);
       setEditingOwner(null);

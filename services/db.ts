@@ -27,6 +27,7 @@ export const db = {
     if (prop.id && !String(prop.id).startsWith('temp_')) {
       await mysqlApi.updateData('properties', String(prop.id), prop);
     } else {
+      delete prop.id;
       await mysqlApi.insertData('properties', prop);
     }
   },
@@ -68,6 +69,7 @@ export const db = {
     if (res.id && !String(res.id).startsWith('temp_')) {
       await mysqlApi.updateData('reservations', String(res.id), res);
     } else {
+      delete res.id;
       await mysqlApi.insertData('reservations', res);
     }
   },

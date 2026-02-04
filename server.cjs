@@ -117,6 +117,32 @@ app.delete('/api/files/owner/:ownerId/:filename', (req, res) => {
   }
 });
 
+
+// API Endpoints for Owners
+const OwnersService = require('./services/OwnersService.cjs');
+const ownersService = new OwnersService();
+
+// GET all owners
+app.get('/api/owners', async (req, res) => {
+  try {
+    const owners = await ownersService.getAll();
+    res.json(owners);
+  } catch (error) {
+    console.error('Error fetching owners:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// POST create owner
+app.post('/api/owners', async (req, res) => {
+  try {
+    const result = await ownersService.create(req.body);
+    res.json(result);
+  } catch (error) {
+    console.error('Error creating owner:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });

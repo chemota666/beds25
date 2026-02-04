@@ -27,7 +27,7 @@ export const ReservationModal: React.FC<ReservationModalProps> = ({ rooms: initi
       propertyId: initialPropId === 'all' ? (initialRooms.length > 0 ? initialRooms[0].propertyId : '') : initialPropId,
       roomId: initialData?.roomId || (initialRooms.length > 0 ? initialRooms[0].id : ''),
       guestId: '',
-      amount: 0,
+      amount: initialReservation?.price || initialReservation?.amount || 0,
       startDate: initialData?.date || new Date().toISOString().split('T')[0],
       endDate: initialData?.date || new Date().toISOString().split('T')[0],
       paymentMethod: 'pending',
