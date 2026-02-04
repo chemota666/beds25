@@ -75,3 +75,14 @@ export interface User {
   createdAt: string;
   updatedAt: string;
 }
+
+export interface Owner {
+  id: string;
+  name: string;
+  dni?: string;
+  phone?: string;
+  invoiceSeries?: string;
+  lastInvoiceNumber?: number;
+  createdAt?: string;
+  updatedAt?: string;
+}

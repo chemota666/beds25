@@ -124,5 +124,35 @@ export const db = {
 
   getInvoices: async (): Promise<Invoice[]> => [],
   saveInvoice: async (inv: Invoice) => {},
-  deleteInvoice: async (id: string) => {}
+  deleteInvoice: async (id: string) => {},
+
+  // OWNERS CRUD
+  getOwners: async (): Promise<Owner[]> => {
+    try {
+      const data = await mysqlApi.fetchData('owners');
+      return data;
+    } catch (error) {
+      return [];
+    }
+  },
+
+  saveOwner: async (owner: Owner) => {
+    // Si tiene ID numerico, es una actualizacion
+    if (owner.id && !isNaN(Number(owner.id))) {
+      await mysqlApi.updateData('owners', String(owner.id), owner);
+    } else {
+      // Es nuevo, generar serie de facturacion si no tiene
+      if (!owner.invoiceSeries) {
+        const randomSuffix = Math.random().toString(36).substring(2, 6).toUpperCase();
+        owner.invoiceSeries = 'F' + randomSuffix;
+      }
+      // Quitar el id para que MySQL lo genere
+      delete owner.id;
+      await mysqlApi.insertData('owners', owner);
+    }
+  },
+
+  deleteOwner: async (id: string) => {
+    await mysqlApi.deleteData('owners', id);
+  }
 };

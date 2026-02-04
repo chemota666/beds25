@@ -22,7 +22,7 @@ export const ReservationModal: React.FC<ReservationModalProps> = ({ rooms: initi
   const [loading, setLoading] = useState(false);
 
   const [formData, setFormData] = useState<Partial<Reservation>>(
-    initialReservation ? { ...initialReservation, startDate: initialReservation.startDate?.split("T")[0], endDate: initialReservation.endDate?.split("T")[0] } : {
+    initialReservation || {
       id: Math.random().toString(36).substr(2, 9),
       propertyId: initialPropId === 'all' ? (initialRooms.length > 0 ? initialRooms[0].propertyId : '') : initialPropId,
       roomId: initialData?.roomId || (initialRooms.length > 0 ? initialRooms[0].id : ''),
@@ -154,7 +154,7 @@ export const ReservationModal: React.FC<ReservationModalProps> = ({ rooms: initi
                     <p className="text-xs text-gray-500">{selectedGuest.dni}</p>
                   </div>
                 </div>
-                {true && (
+                {!initialReservation && (
                   <button type="button" onClick={() => setFormData({...formData, guestId: ''})} className="text-xs font-bold text-blue-600">Cambiar</button>
                 )}
               </div>

@@ -29,7 +29,7 @@ export const Billing: React.FC = () => {
   const filteredData = useMemo(() => {
     return reservations.filter(r => {
       // Solo mostramos lo COBRADO (transferencia o efectivo)
-      const isPaid = r.paymentMethod === 'transfer' || r.paymentMethod === 'cash';
+      const isPaid = r.paymentMethod === 'transfer' || r.paymentMethod === 'bank' || r.paymentMethod === 'cash';
       if (!isPaid) return false;
 
       const matchProp = filter.propertyId ? r.propertyId === filter.propertyId : true;

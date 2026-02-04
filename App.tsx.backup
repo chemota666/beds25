@@ -5,6 +5,8 @@ import { Layout } from './components/Layout';
 import { Dashboard } from './pages/Dashboard';
 import { Guests } from './pages/Guests';
 import { Properties } from './pages/Properties';
+import { Billing } from './pages/Billing';
+import { Debtors } from './pages/Debtors';
 import { Owners } from './pages/Owners';
 
 const App: React.FC = () => {
@@ -16,6 +18,8 @@ const App: React.FC = () => {
           <Route path="/" element={<Dashboard />} />
           <Route path="/guests" element={<Guests />} />
           <Route path="/properties" element={<Properties />} />
+          <Route path="/billing" element={<Billing />} />
+          <Route path="/debtors" element={<Debtors />} />
         <Route path="/owners" element={<Owners />} />
           <Route path="*" element={<Navigate to="/" />} />
         </Routes>

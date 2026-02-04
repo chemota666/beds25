@@ -1,0 +1,122 @@
+import express from 'express';
+import cors from 'cors';
+import mysql from 'mysql2/promise';
+
+const app = express();
+app.use(cors());
+app.use(express.json());
+
+const pool = mysql.createPool({
+  host: '127.0.0.1',
+  user: 'roomflow',
+  password: 'roomflow123',
+  database: 'roomflow_pms',
+  waitForConnections: true,
+  connectionLimit: 10
+});
+
+// Helper function to map booking fields
+function mapBookingFields(data) {
+  const mapped = { ...data };
+  if (mapped.amount !== undefined) {
+    mapped.price = mapped.amount;
+    delete mapped.amount;
+  }
+  return mapped;
+}
+
+// Helper to remove timestamp fields
+function cleanTimestamps(data) {
+  const cleaned = { ...data };
+  delete cleaned.id;
+  delete cleaned.createdAt;
+  delete cleaned.updatedAt;
+  delete cleaned.created_at;
+  delete cleaned.updated_at;
+  return cleaned;
+}
+
+// GET all records from a table
+app.get('/api/:table', async (req, res) => {
+  try {
+    const [rows] = await pool.query(`SELECT * FROM \`${req.params.table}\``);
+    res.json(rows);
+  } catch (err) {
+    console.error('GET error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET single record
+app.get('/api/:table/:id', async (req, res) => {
+  try {
+    const [rows] = await pool.query(`SELECT * FROM \`${req.params.table}\` WHERE id = ?`, [req.params.id]);
+    res.json(rows[0] || null);
+  } catch (err) {
+    console.error('GET by ID error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST new record
+app.post('/api/:table', async (req, res) => {
+  try {
+    let data = cleanTimestamps(req.body);
+    
+    // Map fields for bookings/reservations
+    if (req.params.table === 'bookings' || req.params.table === 'reservations') {
+      data = mapBookingFields(data);
+    }
+    
+    const keys = Object.keys(data);
+    const values = Object.values(data);
+    const placeholders = keys.map(() => '?').join(', ');
+    const columns = keys.map(k => `\`${k}\``).join(', ');
+    
+    const [result] = await pool.query(
+      `INSERT INTO \`${req.params.table}\` (${columns}) VALUES (${placeholders})`,
+      values
+    );
+    res.json({ ...data, id: result.insertId });
+  } catch (err) {
+    console.error('POST error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// PUT update record
+app.put('/api/:table/:id', async (req, res) => {
+  try {
+    let data = cleanTimestamps(req.body);
+    
+    // Map fields for bookings/reservations
+    if (req.params.table === 'bookings' || req.params.table === 'reservations') {
+      data = mapBookingFields(data);
+    }
+    
+    const keys = Object.keys(data);
+    const values = Object.values(data);
+    const setClause = keys.map(k => `\`${k}\` = ?`).join(', ');
+    
+    await pool.query(`UPDATE \`${req.params.table}\` SET ${setClause} WHERE id = ?`, [...values, req.params.id]);
+    res.json({ ...req.body, id: parseInt(req.params.id) });
+  } catch (err) {
+    console.error('PUT error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// DELETE record
+app.delete('/api/:table/:id', async (req, res) => {
+  try {
+    await pool.query(`DELETE FROM \`${req.params.table}\` WHERE id = ?`, [req.params.id]);
+    res.json({ success: true });
+  } catch (err) {
+    console.error('DELETE error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.listen(3003, '127.0.0.1', () => {
+  console.log('API server running on port 3003');
+});
