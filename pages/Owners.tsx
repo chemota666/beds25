@@ -14,7 +14,7 @@ export const Owners: React.FC = () => {
 
   const loadOwners = async () => {
     // Load via REST API
-    const response = await fetch('http://n8n-contabo.ddns.net:3003/api/owners');
+    const response = await fetch('/api/owners');
     const data = await response.json();
     setOwners(data);
   };
@@ -23,7 +23,7 @@ export const Owners: React.FC = () => {
     e.preventDefault();
     if (editingOwner) {
       // Save via REST API
-      const response = await fetch('http://n8n-contabo.ddns.net:3003/api/owners', {
+      const response = await fetch('/api/owners', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(editingOwner)
