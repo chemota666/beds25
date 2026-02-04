@@ -2,10 +2,10 @@ import { Property, Room, Reservation, Guest, Invoice } from '../types';
 import { mysqlApi } from './mysqlApi';
 
 const KEYS = {
-  PROPERTIES: 'roomflow_properties',
-  ROOMS: 'roomflow_rooms',
-  RESERVATIONS: 'roomflow_reservations',
-  GUESTS: 'roomflow_guests',
+  PROPERTIES: 'properties',
+  ROOMS: 'rooms',
+  RESERVATIONS: 'reservations',
+  GUESTS: 'guests',
   LAST_RES_NUMBER: 'roomflow_last_res_number',
   LAST_INV_NUMBER: 'roomflow_last_inv_number',
   AUTH_USER: 'roomflow_auth_user'
@@ -24,7 +24,7 @@ export const db = {
   },
 
   saveProperty: async (prop: Property) => {
-    if (prop.id) {
+    if (prop.id && !String(prop.id).startsWith('temp_')) {
       await mysqlApi.updateData('properties', String(prop.id), prop);
     } else {
       await mysqlApi.insertData('properties', prop);

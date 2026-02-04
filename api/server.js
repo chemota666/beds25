@@ -3,11 +3,12 @@ import express from 'express';
 import cors from 'cors';
 import mysql from 'mysql2/promise';
 
+import proxyPool from './mysqlProxyPool.js';
 const app = express();
 app.use(cors());
 app.use(express.json());
 
-const pool = mysql.createPool({
+const pool = process.env.CODESPACES ? proxyPool : mysql.createPool({
   host: '127.0.0.1',
   user: 'roomflow',
   password: 'roomflow123',
@@ -190,3 +191,191 @@ app.delete('/files/owner/:ownerId/:filename', (req, res) => {
 app.listen(3003, '127.0.0.1', () => {
   console.log('API server running on port 3003');
 });
+
+// ============================================
+// ENDPOINTS CRUD - CONECTAR SERVICIOS
+// ============================================
+const { OwnersService } = require('./services/ownersService.ts');
+const { PropertiesService } = require('./services/propertiesService.ts');
+const { InvoicesService } = require('./services/invoicesService.ts');
+
+// Inicializar servicios
+const ownersService = new OwnersService(proxyPool);
+const propertiesService = new PropertiesService(proxyPool);
+const invoicesService = new InvoicesService(proxyPool, ownersService);
+
+// ============= OWNERS ENDPOINTS =============
+// GET /api/owners - Obtener todos los propietarios
+app.get('/api/owners', async (req, res) => {
+  try {
+    const owners = await ownersService.getAllOwners();
+    res.json(owners);
+  } catch (error) {
+    console.error('Error getting owners:', error);
+    res.status(500).json({ error: 'Error al obtener propietarios' });
+  }
+});
+
+// GET /api/owners/:id - Obtener un propietario por ID
+app.get('/api/owners/:id', async (req, res) => {
+  try {
+    const owner = await ownersService.getOwnerById(parseInt(req.params.id));
+    if (!owner) {
+      return res.status(404).json({ error: 'Propietario no encontrado' });
+    }
+    res.json(owner);
+  } catch (error) {
+    console.error('Error getting owner:', error);
+    res.status(500).json({ error: 'Error al obtener propietario' });
+  }
+});
+
+// POST /api/owners - Crear nuevo propietario
+app.post('/api/owners', async (req, res) => {
+  try {
+    const newOwner = await ownersService.createOwner(req.body);
+    res.status(201).json(newOwner);
+  } catch (error) {
+    console.error('Error creating owner:', error);
+    res.status(500).json({ error: 'Error al crear propietario' });
+  }
+});
+
+// PUT /api/owners/:id - Actualizar propietario
+app.put('/api/owners/:id', async (req, res) => {
+  try {
+    const updated = await ownersService.updateOwner(parseInt(req.params.id), req.body);
+    res.json(updated);
+  } catch (error) {
+    console.error('Error updating owner:', error);
+    res.status(500).json({ error: 'Error al actualizar propietario' });
+  }
+});
+
+// DELETE /api/owners/:id - Eliminar propietario
+app.delete('/api/owners/:id', async (req, res) => {
+  try {
+    await ownersService.deleteOwner(parseInt(req.params.id));
+    res.status(204).send();
+  } catch (error) {
+    console.error('Error deleting owner:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ============= PROPERTIES ENDPOINTS =============
+// GET /api/properties - Obtener todas las propiedades
+app.get('/api/properties', async (req, res) => {
+  try {
+    const ownerId = req.query.ownerId ? parseInt(req.query.ownerId) : undefined;
+    const properties = await propertiesService.getAllProperties(ownerId);
+    res.json(properties);
+  } catch (error) {
+    console.error('Error getting properties:', error);
+    res.status(500).json({ error: 'Error al obtener propiedades' });
+  }
+});
+
+// GET /api/properties/:id - Obtener una propiedad por ID
+app.get('/api/properties/:id', async (req, res) => {
+  try {
+    const property = await propertiesService.getPropertyById(parseInt(req.params.id));
+    if (!property) {
+      return res.status(404).json({ error: 'Propiedad no encontrada' });
+    }
+    res.json(property);
+  } catch (error) {
+    console.error('Error getting property:', error);
+    res.status(500).json({ error: 'Error al obtener propiedad' });
+  }
+});
+
+// POST /api/properties - Crear nueva propiedad con rooms
+app.post('/api/properties', async (req, res) => {
+  try {
+    const newProperty = await propertiesService.createProperty(req.body);
+    res.status(201).json(newProperty);
+  } catch (error) {
+    console.error('Error creating property:', error);
+    res.status(500).json({ error: 'Error al crear propiedad' });
+  }
+});
+
+// PUT /api/properties/:id - Actualizar propiedad
+app.put('/api/properties/:id', async (req, res) => {
+  try {
+    const updated = await propertiesService.updateProperty(parseInt(req.params.id), req.body);
+    res.json(updated);
+  } catch (error) {
+    console.error('Error updating property:', error);
+    res.status(500).json({ error: 'Error al actualizar propiedad' });
+  }
+});
+
+// DELETE /api/properties/:id - Eliminar propiedad
+app.delete('/api/properties/:id', async (req, res) => {
+  try {
+    await propertiesService.deleteProperty(parseInt(req.params.id));
+    res.status(204).send();
+  } catch (error) {
+    console.error('Error deleting property:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// GET /api/properties/:id/rooms - Obtener habitaciones de una propiedad
+app.get('/api/properties/:id/rooms', async (req, res) => {
+  try {
+    const rooms = await propertiesService.getRoomsByProperty(parseInt(req.params.id));
+    res.json(rooms);
+  } catch (error) {
+    console.error('Error getting rooms:', error);
+    res.status(500).json({ error: 'Error al obtener habitaciones' });
+  }
+});
+
+// ============= INVOICES ENDPOINTS =============
+// POST /api/reservations/:id/mark-paid - Marcar reserva como pagada y generar factura
+app.post('/api/reservations/:id/mark-paid', async (req, res) => {
+  try {
+    const { paymentMethod, amount } = req.body;
+    const invoice = await invoicesService.markPaidAndCreateInvoice({
+      reservationId: parseInt(req.params.id),
+      paymentMethod,
+      amount
+    });
+    res.status(201).json(invoice);
+  } catch (error) {
+    console.error('Error marking paid and creating invoice:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// GET /api/invoices - Obtener todas las facturas
+app.get('/api/invoices', async (req, res) => {
+  try {
+    const limit = req.query.limit ? parseInt(req.query.limit) : 100;
+    const offset = req.query.offset ? parseInt(req.query.offset) : 0;
+    const invoices = await invoicesService.getAllInvoices(limit, offset);
+    res.json(invoices);
+  } catch (error) {
+    console.error('Error getting invoices:', error);
+    res.status(500).json({ error: 'Error al obtener facturas' });
+  }
+});
+
+// GET /api/invoices/:id - Obtener una factura por ID
+app.get('/api/invoices/:id', async (req, res) => {
+  try {
+    const invoice = await invoicesService.getInvoiceById(parseInt(req.params.id));
+    if (!invoice) {
+      return res.status(404).json({ error: 'Factura no encontrada' });
+    }
+    res.json(invoice);
+  } catch (error) {
+    console.error('Error getting invoice:', error);
+    res.status(500).json({ error: 'Error al obtener factura' });
+  }
+});
+
+console.log('\u2705 Endpoints CRUD conectados exitosamente');

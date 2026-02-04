@@ -31,7 +31,7 @@ export const Properties: React.FC = () => {
 
   const handleNewProperty = () => {
     setEditingProperty({
-      id: Math.random().toString(36).substr(2, 9),
+      id: 'temp_' + Math.random().toString(36).substr(2, 9),
       name: '',
       address: '',
       city: '',
