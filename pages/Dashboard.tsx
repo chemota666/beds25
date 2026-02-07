@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { db } from '../services/db';
 import { Property, Room, Reservation } from '../types';
 import { Timeline } from '../components/Timeline';
@@ -12,10 +12,30 @@ export const Dashboard: React.FC = () => {
   const [reservations, setReservations] = useState<Reservation[]>([]);
   const [currentDate, setCurrentDate] = useState(new Date());
   const [loading, setLoading] = useState(true);
+    const [selectedCity, setSelectedCity] = useState<string>('all');
+  
   
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingReservation, setEditingReservation] = useState<Reservation | null>(null);
   const [initialDataForNew, setInitialDataForNew] = useState<{ roomId: string, date: string } | null>(null);
+  // Compute unique cities from properties
+  const uniqueCities = useMemo(() => {
+    const cities = properties.map(p => p.city).filter(Boolean);
+    return [...new Set(cities)].sort();
+  }, [properties]);
+
+  // Filter properties by selected city
+  const filteredProperties = useMemo(() => {
+    if (selectedCity === 'all') return properties;
+    return properties.filter(p => p.city === selectedCity);
+  }, [properties, selectedCity]);
+
+  // Filter rooms by selected city
+  const filteredRooms = useMemo(() => {
+    if (selectedCity === 'all') return rooms;
+    const cityPropertyIds = filteredProperties.map(p => p.id);
+    return rooms.filter(r => cityPropertyIds.includes(r.property_id));
+  }, [rooms, selectedCity, filteredProperties]);
 
   useEffect(() => {
     const loadProperties = async () => {
@@ -126,6 +146,21 @@ export const Dashboard: React.FC = () => {
                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg>
             </div>
           </div>
+                    {/* City Filter */}
+          <div className="relative">
+            <label className="absolute -top-2 left-3 bg-white px-1 text-xs text-gray-500">Ciudad</label>
+            <select
+              value={selectedCity}
+              onChange={(e) => setSelectedCity(e.target.value)}
+              className="bg-gray-50 border border-gray-200 rounded-lg py-3 px-4 pr-10 appearance-none cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="all">🏙️ Todas las Ciudades</option>
+              {uniqueCities.map(city => <option key={city} value={city}>{city}</option>)}
+            </select>
+            <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+            </div>
+          </div>
 
           <button 
             onClick={() => { setEditingReservation(null); setInitialDataForNew(null); setIsModalOpen(true); }}
@@ -173,9 +208,9 @@ export const Dashboard: React.FC = () => {
         </div>
 
         <Timeline 
-          rooms={rooms} 
+          rooms={filteredRooms} 
           reservations={reservations} 
-          properties={properties}
+          properties={filteredProperties}
           currentDate={currentDate} 
           onCellClick={handleCellClick}
           onReservationClick={handleReservationClick}

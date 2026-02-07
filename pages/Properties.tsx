@@ -7,12 +7,15 @@ export const Properties: React.FC = () => {
   const [properties, setProperties] = useState<Property[]>([]);
   const [editingProperty, setEditingProperty] = useState<Property | null>(null);
   const [isPropertyModalOpen, setIsPropertyModalOpen] = useState(false);
+    const [owners, setOwners] = useState<any[]>([]);
 
   // FIX: Wrapped async call in a function within useEffect
   useEffect(() => {
     const loadProperties = async () => {
       const props = await db.getProperties();
       setProperties(props);
+      const ownrs = await fetch('/api/owners').then(r => r.json()).catch(() => []);
+      setOwners(ownrs);
     };
     loadProperties();
   }, []);
@@ -125,11 +128,20 @@ export const Properties: React.FC = () => {
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-gray-500 uppercase mb-1">Propietario</label>
-                  <input 
-                    required type="text" className="w-full bg-gray-50 border border-gray-200 rounded-lg p-2 outline-none focus:ring-2 focus:ring-blue-500" 
-                    value={editingProperty.owner} onChange={e => setEditingProperty({...editingProperty, owner: e.target.value})}
-                  />
+                  <label className="block text-xs font-semibold text-gray-500 uppercase mb-1">
+                    
+                  </label>
+                                <select
+                required
+                className="w-full bg-gray-50 border border-gray-200 rounded-lg p-2"
+                value={editingProperty.owner}
+                onChange={e => setEditingProperty({...editingProperty, owner: e.target.value})}
+              >
+                <option value="">Seleccionar propietario...</option>
+                {owners.map(o => (
+                  <option key={o.id} value={o.name}>{o.name}</option>
+                ))}
+              </select>
                 </div>
                 <div>
                   <label className="block text-xs font-semibold text-gray-500 uppercase mb-1">Número de Habitaciones</label>

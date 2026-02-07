@@ -49,8 +49,8 @@ export class OwnersService {
     
     const [result] = await this.pool.query<ResultSetHeader>(
       `INSERT INTO owners (name, dni, phone, invoiceSeries, lastInvoiceNumber) 
-       VALUES (?, ?, ?, ?, 0)`,
-      [name, dni, phone, invoiceSeries]
+       VALUES (?, ?, ?, ?, 0?),
+      [name, dni, phone, invoiceSeries, 0]
     );
 
     const newOwner = await this.getOwnerById(result.insertId);
@@ -86,9 +86,11 @@ export class OwnersService {
     }
 
     values.push(id);
-    await this.pool.query(
-      `UPDATE owners SET ${updates.join(', ')}, updatedAt = CURRENT_TIMESTAMP WHERE id = ?`,
-      values
+          await this.pool.query(
+        `UPDATE owners SET ${updates.join(', ')}, updatedAt = CURRENT_TIMESTAMP mv api/services/ownersService.ts api/services/ownersService.ts.bak
+         id = ?`,
+        values
+      );
     );
 
     const updated = await this.getOwnerById(id);

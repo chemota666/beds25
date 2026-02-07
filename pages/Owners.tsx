@@ -14,8 +14,7 @@ export const Owners: React.FC = () => {
 
   const loadOwners = async () => {
     // Load via REST API
-    const response = await fetch('/api/owners');
-    const data = await response.json();
+    const data = await db.getOwners();
     setOwners(data);
   };
 
@@ -23,12 +22,7 @@ export const Owners: React.FC = () => {
     e.preventDefault();
     if (editingOwner) {
       // Save via REST API
-      const response = await fetch('/api/owners', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(editingOwner)
-      });
-      if (!response.ok) throw new Error('Error saving owner');
+      await db.saveOwner(editingOwner);
       await loadOwners();
       setIsModalOpen(false);
       setEditingOwner(null);

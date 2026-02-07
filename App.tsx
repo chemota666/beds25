@@ -6,6 +6,7 @@ import { Dashboard } from './pages/Dashboard';
 import { Guests } from './pages/Guests';
 import { Properties } from './pages/Properties';
 import { Owners } from './pages/Owners';
+import { Reservations } from './pages/Reservations';
 
 const App: React.FC = () => {
   // Login deshabilitado temporalmente: cargamos directamente el Router
@@ -17,6 +18,7 @@ const App: React.FC = () => {
           <Route path="/guests" element={<Guests />} />
           <Route path="/properties" element={<Properties />} />
         <Route path="/owners" element={<Owners />} />
+          <Route path="/reservations" element={<Reservations />} />
           <Route path="*" element={<Navigate to="/" />} />
         </Routes>
       </Layout>

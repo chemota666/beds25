@@ -1,4 +1,4 @@
-import { Property, Room, Reservation, Guest, Invoice } from '../types';
+import { Property, Room, Reservation, Guest, Invoice, Owner } from '../types';
 import { mysqlApi } from './mysqlApi';
 
 const KEYS = {

@@ -27,7 +27,7 @@ export const ReservationModal: React.FC<ReservationModalProps> = ({ rooms: initi
       propertyId: initialPropId === 'all' ? (initialRooms.length > 0 ? initialRooms[0].propertyId : '') : initialPropId,
       roomId: initialData?.roomId || (initialRooms.length > 0 ? initialRooms[0].id : ''),
       guestId: '',
-      amount: initialReservation?.price || initialReservation?.amount || 0,
+      price: initialReservation?.price || initialReservation?.amount || 0,
       startDate: initialData?.date || new Date().toISOString().split('T')[0],
       endDate: initialData?.date || new Date().toISOString().split('T')[0],
       paymentMethod: 'pending',
@@ -212,7 +212,7 @@ export const ReservationModal: React.FC<ReservationModalProps> = ({ rooms: initi
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
              <div>
               <label className="block text-xs font-bold text-gray-400 uppercase mb-1">Importe Mensual (€)</label>
-              <input required type="number" className="w-full border rounded-lg p-2.5 outline-none" value={formData.amount} onChange={e => setFormData({...formData, amount: Number(e.target.value)})} />
+              <input required type="number" className="w-full border rounded-lg p-2.5 outline-none" value={formData.price} onChange={e => setFormData({...formData, price: Number(e.target.value)})} />
             </div>
             <div>
               <label className="block text-xs font-bold text-gray-400 uppercase mb-1">Método de Pago</label>

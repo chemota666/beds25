@@ -52,7 +52,7 @@ export interface Reservation extends AuditFields {
   propertyId: string;
   roomId: string;
   guestId: string;
-  amount: number;
+  price: number;
   startDate: string; // ISO format
   endDate: string;   // ISO format
   paymentMethod: PaymentMethod;
