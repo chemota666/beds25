@@ -7,7 +7,8 @@ interface TimelineProps {
   rooms: Room[];
   reservations: Reservation[];
   properties: Property[];
-  currentDate: Date;
+  startDate: Date;
+  daysToShow: number;
   onCellClick: (roomId: string, date: Date) => void;
   onReservationClick: (res: Reservation) => void;
   isAllProperties: boolean;
@@ -19,8 +20,13 @@ const paymentColors: Record<PaymentMethod, string> = {
   'cash': 'bg-green-500 text-white border-green-600',
 };
 
-export const Timeline: React.FC<TimelineProps> = ({ rooms, reservations, properties, currentDate, onCellClick, onReservationClick, isAllProperties }) => {
+export const Timeline: React.FC<TimelineProps> = ({ rooms, reservations, properties, startDate, daysToShow, onCellClick, onReservationClick, isAllProperties }) => {
   const [guests, setGuests] = useState<Guest[]>([]);
+
+  const parseLocalDate = (value: string) => {
+    if (!value) return new Date('');
+    return value.includes('T') ? new Date(value) : new Date(`${value}T00:00:00`);
+  };
   
   // FIX: Handled async call to db.getGuests() correctly within useEffect
   useEffect(() => {
@@ -32,18 +38,24 @@ export const Timeline: React.FC<TimelineProps> = ({ rooms, reservations, propert
   }, [reservations]);
 
   const days = useMemo(() => {
-    const start = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
-    const arr = [];
-    for (let i = 0; i < 31; i++) {
+    const start = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate(), 0, 0, 0, 0);
+    const arr: Date[] = [];
+    const totalDays = Math.max(1, daysToShow);
+    for (let i = 0; i < totalDays; i++) {
       const d = new Date(start);
       d.setDate(start.getDate() + i);
       arr.push(d);
     }
     return arr;
-  }, [currentDate]);
+  }, [startDate, daysToShow]);
 
   const getDayName = (date: Date) => {
     return date.toLocaleDateString('es-ES', { weekday: 'short' }).charAt(0).toUpperCase() + date.toLocaleDateString('es-ES', { weekday: 'short' }).slice(1, 3);
+  };
+
+  const getMonthShort = (date: Date) => {
+    const raw = date.toLocaleDateString('es-ES', { month: 'short' }).replace('.', '');
+    return raw.charAt(0).toUpperCase() + raw.slice(1, 3);
   };
 
   const isToday = (date: Date) => {
@@ -82,7 +94,7 @@ export const Timeline: React.FC<TimelineProps> = ({ rooms, reservations, propert
               }`}
             >
               <div className="uppercase opacity-80">{getDayName(day)}</div>
-              <div className="text-lg leading-tight">{day.getDate()}</div>
+              <div className="text-lg leading-tight">{day.getDate()} {getMonthShort(day)}</div>
             </div>
           ))}
         </div>
@@ -114,17 +126,18 @@ export const Timeline: React.FC<TimelineProps> = ({ rooms, reservations, propert
               {reservations
                 .filter(res => res.roomId === room.id)
                 .map(res => {
-                  const start = new Date(res.startDate);
-                  const end = new Date(res.endDate);
-                  const monthStart = days[0];
+                  const start = parseLocalDate(res.startDate);
+                  const end = parseLocalDate(res.endDate);
+                  const windowStart = days[0];
+                  const windowDays = days.length;
                   
-                  const startIndex = Math.floor((start.getTime() - monthStart.getTime()) / (1000 * 60 * 60 * 24));
-                  const duration = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
+                  const startIndex = Math.floor((start.getTime() - windowStart.getTime()) / (1000 * 60 * 60 * 24));
+                  const duration = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1;
                   
-                  if (startIndex + duration < 0 || startIndex > 31) return null;
+                  if (startIndex + duration < 0 || startIndex > windowDays) return null;
 
                   const adjustedStart = Math.max(0, startIndex);
-                  const adjustedWidth = Math.min(31 - adjustedStart, duration + (startIndex < 0 ? startIndex : 0));
+                  const adjustedWidth = Math.min(windowDays - adjustedStart, duration + (startIndex < 0 ? startIndex : 0));
 
                   return (
                     <div

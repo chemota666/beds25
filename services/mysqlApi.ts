@@ -43,7 +43,14 @@ export const mysqlApi = {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data)
       });
-      if (!response.ok) throw new Error(`Error ${response.status}`);
+      if (!response.ok) {
+        let detail = '';
+        try {
+          const err = await response.json();
+          if (err && err.error) detail = `: ${err.error}`;
+        } catch (_) {}
+        throw new Error(`Error ${response.status}${detail}`);
+      }
       return await response.json();
     } catch (error: any) {
       lastError = error.message;
@@ -58,7 +65,14 @@ export const mysqlApi = {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data)
       });
-      if (!response.ok) throw new Error(`Error ${response.status}`);
+      if (!response.ok) {
+        let detail = '';
+        try {
+          const err = await response.json();
+          if (err && err.error) detail = `: ${err.error}`;
+        } catch (_) {}
+        throw new Error(`Error ${response.status}${detail}`);
+      }
       return await response.json();
     } catch (error: any) {
       lastError = error.message;
@@ -71,7 +85,14 @@ export const mysqlApi = {
       const response = await fetchWithTimeout(getUrl(table, id), {
         method: 'DELETE'
       });
-      if (!response.ok) throw new Error(`Error ${response.status}`);
+      if (!response.ok) {
+        let detail = '';
+        try {
+          const err = await response.json();
+          if (err && err.error) detail = `: ${err.error}`;
+        } catch (_) {}
+        throw new Error(`Error ${response.status}${detail}`);
+      }
       return await response.json();
     } catch (error: any) {
       lastError = error.message;

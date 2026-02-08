@@ -31,6 +31,7 @@ export interface Property extends AuditFields {
   address: string;
   city: string;
   owner: string;
+  managerId?: string;
   numRooms: number;
   createdAt?: string;
   updatedAt?: string;
@@ -52,13 +53,17 @@ export interface Reservation extends AuditFields {
   propertyId: string;
   roomId: string;
   guestId: string;
-  amount: number;
+  price?: number;
+  amount?: number;
+  status?: string;
   startDate: string; // ISO format
   endDate: string;   // ISO format
   paymentMethod: PaymentMethod;
+  cashDelivered?: boolean;
+  paymentReceiptFile?: string;
   notes?: string;
-  createdAt: string;
-  updatedAt: string;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface Invoice {
@@ -66,6 +71,17 @@ export interface Invoice {
   number: string;
   reservationId: string;
   createdAt: string;
+}
+
+export interface Document {
+  id: string;
+  userId: string;
+  documentType: string;
+  fileName: string;
+  filePath: string;
+  fileSize: number;
+  mimeType: string;
+  uploadedAt: string;
 }
 
 export interface User {
@@ -81,8 +97,37 @@ export interface Owner {
   name: string;
   dni?: string;
   phone?: string;
-  invoiceSeries?: string;
-  lastInvoiceNumber?: number;
+  taxId?: string;
+  taxAddress?: string;
+  commission?: number;
+  invoiceSeries: string;
+  lastInvoiceNumber: number;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface IncidentLine {
+  description: string;
+  amount: number;
+}
+
+export interface Incident extends AuditFields {
+  id: string;
+  propertyId: string;
+  title: string;
+  solved: boolean;
+  refactured: boolean;
+  lines: IncidentLine[];
+  total: number;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface Manager {
+  id: string;
+  name: string;
+  phone?: string;
+  notes?: string;
   createdAt?: string;
   updatedAt?: string;
 }
