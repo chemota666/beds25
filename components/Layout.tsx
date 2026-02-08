@@ -3,13 +3,14 @@ import React, { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { db } from '../services/db';
 
-const SidebarLink: React.FC<{ to: string, icon: React.ReactNode, label: string, collapsed?: boolean }> = ({ to, icon, label, collapsed }) => {
+const SidebarLink: React.FC<{ to: string, icon: React.ReactNode, label: string, collapsed?: boolean, onClick?: () => void }> = ({ to, icon, label, collapsed, onClick }) => {
   const location = useLocation();
   const isActive = location.pathname === to;
   
   return (
     <Link 
       to={to} 
+      onClick={onClick}
       className={`w-full flex items-center ${collapsed ? 'justify-center' : 'space-x-3'} p-3 rounded-lg transition-colors ${
         isActive ? 'bg-blue-600 text-white shadow-md' : 'text-gray-600 hover:bg-gray-100'
       }`}
@@ -20,13 +21,14 @@ const SidebarLink: React.FC<{ to: string, icon: React.ReactNode, label: string, 
   );
 };
 
-const SidebarSubLink: React.FC<{ to: string, label: string }> = ({ to, label }) => {
+const SidebarSubLink: React.FC<{ to: string, label: string, onClick?: () => void }> = ({ to, label, onClick }) => {
   const location = useLocation();
   const isActive = location.pathname === to;
 
   return (
     <Link
       to={to}
+      onClick={onClick}
       className={`flex items-center px-3 py-2 rounded-lg text-sm transition-colors ${
         isActive ? 'bg-blue-50 text-blue-700 font-semibold' : 'text-gray-600 hover:bg-gray-100'
       }`}
@@ -42,6 +44,7 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
   const currentUser = db.getAuthUser() || 'Admin';
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isConfigOpen, setIsConfigOpen] = useState(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   const isConfigRoute = ['/properties', '/guests', '/managers', '/owners'].includes(location.pathname);
 
@@ -54,10 +57,18 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
     window.location.reload();
   };
 
+  const handleMobileClose = () => setIsMobileMenuOpen(false);
+
   return (
     <div className="flex min-h-screen bg-gray-50">
+      {isMobileMenuOpen && (
+        <div
+          className="fixed inset-0 bg-black/40 z-40 md:hidden"
+          onClick={handleMobileClose}
+        />
+      )}
       {/* Sidebar */}
-      <aside className={`${isSidebarCollapsed ? 'w-16' : 'w-64'} bg-white border-r border-gray-200 hidden md:flex flex-col ${isSidebarCollapsed ? 'p-4' : 'p-6'} fixed inset-y-0 left-0 z-40 overflow-y-auto transition-all duration-200`}>
+      <aside className={`${isSidebarCollapsed ? 'w-16' : 'w-64'} bg-white border-r border-gray-200 flex flex-col ${isSidebarCollapsed ? 'p-4' : 'p-6'} fixed inset-y-0 left-0 z-50 overflow-y-auto transition-all duration-200 md:translate-x-0 ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'} md:flex`}>
         <div className={`mb-10 ${isSidebarCollapsed ? 'px-0' : 'px-2'} flex items-center ${isSidebarCollapsed ? 'justify-center' : 'justify-between'} gap-2`}>
           <div className="flex items-center space-x-2">
             <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
@@ -82,18 +93,21 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
             label="Calendario" 
             icon={<svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 2v3m8-3v3M3.5 9h17M5 5h14a2 2 0 012 2v11a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2z"></path><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 13h4"></path></svg>}
             collapsed={isSidebarCollapsed}
+            onClick={handleMobileClose}
           />
           <SidebarLink
             to="/reservas"
             label="Reservas"
             icon={<svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5h7a2 2 0 012 2v12a2 2 0 01-2 2H7a2 2 0 01-2-2V8l4-3z"></path><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5v3h-3m3 5h6m-6 4h6"></path></svg>}
             collapsed={isSidebarCollapsed}
+            onClick={handleMobileClose}
           />
           <SidebarLink
             to="/incidencias"
             label="Incidencias"
             icon={<svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10.29 3.86l-6.2 10.74A2 2 0 005.83 18h12.34a2 2 0 001.74-3.4l-6.2-10.74a2 2 0 00-3.42 0z"></path><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v4m0 4h.01"></path></svg>}
             collapsed={isSidebarCollapsed}
+            onClick={handleMobileClose}
           />
           <hr className="my-4 border-gray-100" />
           <SidebarLink
@@ -101,6 +115,7 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
             label="Dashboard"
             icon={<svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 5a2 2 0 012-2h4a2 2 0 012 2v6a2 2 0 01-2 2H6a2 2 0 01-2-2V5z"></path><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M14 11a2 2 0 012-2h2a2 2 0 012 2v8a2 2 0 01-2 2h-2a2 2 0 01-2-2v-8z"></path><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M14 5a2 2 0 012-2h2a2 2 0 012 2"></path></svg>}
             collapsed={isSidebarCollapsed}
+            onClick={handleMobileClose}
           />
           <div className="pt-1">
             <button
@@ -122,10 +137,10 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
             </button>
             {!isSidebarCollapsed && isConfigOpen && (
               <div className="mt-2 ml-7 space-y-1">
-                <SidebarSubLink to="/properties" label="Inmuebles" />
-                <SidebarSubLink to="/guests" label="Huéspedes" />
-                <SidebarSubLink to="/managers" label="Gestores" />
-                <SidebarSubLink to="/owners" label="Propietarios" />
+                <SidebarSubLink to="/properties" label="Inmuebles" onClick={handleMobileClose} />
+                <SidebarSubLink to="/guests" label="Huéspedes" onClick={handleMobileClose} />
+                <SidebarSubLink to="/managers" label="Gestores" onClick={handleMobileClose} />
+                <SidebarSubLink to="/owners" label="Propietarios" onClick={handleMobileClose} />
               </div>
             )}
           </div>
@@ -155,6 +170,18 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
 
       {/* Main Content */}
       <main className={`flex-1 ${isSidebarCollapsed ? 'md:ml-16' : 'md:ml-64'} min-h-screen transition-all duration-200`}>
+        <div className="md:hidden sticky top-0 z-30 bg-white border-b border-gray-200 px-4 py-3 flex items-center justify-between">
+          <button
+            type="button"
+            onClick={() => setIsMobileMenuOpen(true)}
+            className="p-2 rounded-lg text-gray-500 hover:bg-gray-100"
+            aria-label="Abrir menú"
+          >
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16" /></svg>
+          </button>
+          <span className="text-sm font-semibold text-gray-700">Beds25</span>
+          <div className="w-8" />
+        </div>
         <div className="p-8">
           {children}
         </div>
