@@ -36,7 +36,7 @@ export const Dashboard: React.FC = () => {
       } else {
         const [propRooms, allRes] = await Promise.all([db.getRooms(selectedPropertyId), db.getReservations()]);
         setRooms(propRooms);
-        setReservations(allRes.filter(r => r.propertyId === selectedPropertyId));
+        setReservations(allRes.filter(r => String(r.propertyId) === String(selectedPropertyId)));
       }
       setLoading(false);
     };
@@ -63,7 +63,7 @@ export const Dashboard: React.FC = () => {
       if (selectedPropertyId === 'all') {
         setReservations(updatedRes);
       } else {
-        setReservations(updatedRes.filter(r => r.propertyId === selectedPropertyId));
+        setReservations(updatedRes.filter(r => String(r.propertyId) === String(selectedPropertyId)));
       }
       setIsModalOpen(false);
       const message = editingReservation ? '✅ Reserva actualizada correctamente' : '✅ Nueva reserva creada';
@@ -91,7 +91,7 @@ export const Dashboard: React.FC = () => {
     if (selectedPropertyId === 'all') {
       setReservations(updatedRes);
     } else {
-      setReservations(updatedRes.filter(r => r.propertyId === selectedPropertyId));
+      setReservations(updatedRes.filter(r => String(r.propertyId) === String(selectedPropertyId)));
     }
     setIsModalOpen(false);
   };
