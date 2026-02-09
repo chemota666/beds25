@@ -721,17 +721,21 @@ app.get('/files/property/:propertyId', (req, res) => {
         const stats = fs.statSync(filePath);
         const parts = name.split('-');
         const type = parts.length > 2 ? parts[0] : 'document';
+        const safeDate = stats && stats.mtime instanceof Date && !Number.isNaN(stats.mtime.getTime())
+          ? stats.mtime.toISOString()
+          : new Date().toISOString();
         return {
           filename: name,
           size: stats.size,
-          uploadDate: stats.mtime.toISOString(),
+          uploadDate: safeDate,
           type,
           path: `/uploads/properties/${req.params.propertyId}/${name}`
         };
       });
     res.json({ files });
   } catch (err) {
-    res.status(500).json({ error: 'No se pudo listar archivos' });
+    console.error('Property files list error:', err && err.message ? err.message : err);
+    res.status(500).json({ error: err && err.message ? err.message : 'No se pudo listar archivos' });
   }
 });
 
