@@ -192,11 +192,53 @@ export const Guests: React.FC = () => {
     }
   };
 
-  const smartDownload = (data: string, filename: string) => {
+  const smartDownload = async (data: string, filename: string) => {
     if (!data) return;
     // Si es URL (Drive o uploads), abrir en nueva pestaña
-    if (data.startsWith('http') || data.startsWith('/uploads/')) {
-      window.open(data, '_blank');
+    if (data.startsWith('http')) {
+      try {
+        const url = new URL(data);
+        if (url.pathname.startsWith('/uploads/')) {
+          const downloadUrl = `${url.origin}/api${url.pathname}`;
+          const response = await fetch(downloadUrl);
+          if (!response.ok) throw new Error('No se pudo descargar el documento');
+          const blob = await response.blob();
+          const blobUrl = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = blobUrl;
+          a.download = filename;
+          a.click();
+          URL.revokeObjectURL(blobUrl);
+        } else {
+          window.open(data, '_blank');
+        }
+      } catch {
+        try {
+          const url = new URL(data);
+          if (url.pathname.startsWith('/uploads/')) {
+            window.open(`${url.origin}/api${url.pathname}`, '_blank');
+          } else {
+            window.open(data, '_blank');
+          }
+        } catch {
+          window.open(data, '_blank');
+        }
+      }
+    } else if (data.startsWith('/uploads/')) {
+      try {
+        const downloadUrl = `/api${data}`;
+        const response = await fetch(downloadUrl);
+        if (!response.ok) throw new Error('No se pudo descargar el documento');
+        const blob = await response.blob();
+        const blobUrl = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = blobUrl;
+        a.download = filename;
+        a.click();
+        URL.revokeObjectURL(blobUrl);
+      } catch {
+        window.open(`/api${data}`, '_blank');
+      }
     } else {
       // Es base64
       const a = document.createElement('a');

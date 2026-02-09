@@ -17,6 +17,7 @@ interface ReservationModalProps {
 export const ReservationModal: React.FC<ReservationModalProps> = ({ rooms: initialRooms, propertyId: initialPropId, initialReservation, initialData, onClose, onSave, onDelete, onReservationUpdated }) => {
   const safeRooms = useMemo(() => (Array.isArray(initialRooms) ? initialRooms : []), [initialRooms]);
   const safePropId = initialPropId ?? '';
+  const [modalRooms, setModalRooms] = useState<Room[]>(safeRooms);
   const [allGuests, setAllGuests] = useState<Guest[]>([]);
   const [allProperties, setAllProperties] = useState<Property[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
@@ -32,6 +33,13 @@ export const ReservationModal: React.FC<ReservationModalProps> = ({ rooms: initi
     if (value === undefined || value === null || value === '') return 0;
     const num = Number(value);
     return Number.isFinite(num) ? num : 0;
+  };
+
+  const formatLocalISODate = (date: Date) => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
   };
 
   const [formData, setFormData] = useState<Partial<Reservation>>(
@@ -67,6 +75,10 @@ export const ReservationModal: React.FC<ReservationModalProps> = ({ rooms: initi
     loadStatic();
   }, []);
 
+  useEffect(() => {
+    setModalRooms(safeRooms);
+  }, [safeRooms]);
+
   // Sincronizar formData cuando cambia initialReservation
   useEffect(() => {
     if (initialReservation) {
@@ -99,9 +111,31 @@ export const ReservationModal: React.FC<ReservationModalProps> = ({ rooms: initi
     setOverbookingError('');
   }, [initialReservation, safeRooms, safePropId, initialData]);
 
-  const availableRooms = useMemo(() => {
-    return safeRooms.filter(r => r.propertyId === formData.propertyId);
+  useEffect(() => {
+    const loadRoomsForProperty = async () => {
+      if (!formData.propertyId) {
+        setModalRooms(safeRooms);
+        return;
+      }
+      try {
+        const propRooms = await db.getRooms(String(formData.propertyId));
+        setModalRooms(propRooms);
+      } catch {
+        setModalRooms(safeRooms);
+      }
+    };
+    loadRoomsForProperty();
   }, [formData.propertyId, safeRooms]);
+
+  const availableRooms = useMemo(() => {
+    return modalRooms.filter(r => r.propertyId === formData.propertyId);
+  }, [formData.propertyId, modalRooms]);
+
+  useEffect(() => {
+    if (!availableRooms.length) return;
+    if (formData.roomId && availableRooms.some(r => String(r.id) === String(formData.roomId))) return;
+    setFormData(prev => ({ ...prev, roomId: availableRooms[0].id }));
+  }, [availableRooms, formData.roomId]);
 
   const selectedGuest = useMemo(() => 
     allGuests.find(g => g.id === formData.guestId), 
@@ -174,8 +208,8 @@ export const ReservationModal: React.FC<ReservationModalProps> = ({ rooms: initi
       amount: normalizedAmount,
       price: normalizedAmount,
       id: 'temp_' + Math.random().toString(36).substr(2, 9),
-      startDate: nextStart.toISOString().split('T')[0],
-      endDate: nextEnd.toISOString().split('T')[0],
+      startDate: formatLocalISODate(nextStart),
+      endDate: formatLocalISODate(nextEnd),
       paymentMethod: 'pending',
       cashDelivered: false,
       createdAt: new Date().toISOString(),

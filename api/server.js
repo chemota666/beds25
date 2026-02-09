@@ -155,6 +155,29 @@ function formatLocalDate(date) {
   return `${year}-${month}-${day}`;
 }
 
+async function syncRoomsForProperty(propertyId, numRooms) {
+  const target = Number(numRooms) || 0;
+  if (!propertyId) return;
+  if (!pool) await ensurePool();
+
+  const [rows] = await pool.query('SELECT id FROM `rooms` WHERE propertyId = ?', [propertyId]);
+  const propRooms = Array.isArray(rows) ? rows : [];
+  const existingCount = propRooms.length;
+
+  if (target > existingCount) {
+    for (let i = existingCount + 1; i <= target; i++) {
+      const roomName = `Habitación ${i}`;
+      await pool.query('INSERT INTO `rooms` (propertyId, name) VALUES (?, ?)', [propertyId, roomName]);
+    }
+  } else if (target < existingCount) {
+    const sorted = propRooms.slice().sort((a, b) => Number(a.id) - Number(b.id));
+    const toRemove = sorted.slice(target);
+    for (const r of toRemove) {
+      try { await pool.query('DELETE FROM `rooms` WHERE id = ?', [r.id]); } catch (_) {}
+    }
+  }
+}
+
 function normalizeRowDates(row) {
   const normalized = { ...row };
   DATE_FIELDS.forEach(field => {
@@ -210,7 +233,15 @@ app.post('/:table', async (req, res) => {
     console.log('SQL:', sql);
     if (!pool) await ensurePool();
     const [result] = await pool.query(sql, values);
-    res.json({ ...data, id: result.insertId });
+    const inserted = { ...data, id: result.insertId };
+    if (req.params.table === 'properties') {
+      try {
+        await syncRoomsForProperty(String(result.insertId), data.numRooms);
+      } catch (e) {
+        console.warn('Room sync failed on property create:', e && e.message ? e.message : e);
+      }
+    }
+    res.json(inserted);
   } catch (err) {
     console.error('POST error:', err.message);
     res.status(500).json({ error: err.message });
@@ -234,6 +265,13 @@ app.put('/:table/:id', async (req, res) => {
     const setClause = keys.map(k => '\`'+k+'\` = ?').join(', ');
     if (!pool) await ensurePool();
     await pool.query(`UPDATE \`${req.params.table}\` SET ${setClause} WHERE id = ?`, [...values, req.params.id]);
+    if (req.params.table === 'properties') {
+      try {
+        await syncRoomsForProperty(String(req.params.id), data.numRooms);
+      } catch (e) {
+        console.warn('Room sync failed on property update:', e && e.message ? e.message : e);
+      }
+    }
     res.json({ ...req.body, id: parseInt(req.params.id) });
   } catch (err) {
     console.error('PUT error:', err.message);
