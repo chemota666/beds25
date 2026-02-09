@@ -345,6 +345,7 @@ const uploadDir = path.join(__dirname_upload, '..', 'uploads', 'owners');
 const guestUploadDir = path.join(__dirname_upload, '..', 'uploads', 'guests');
 const reservationUploadDir = path.join(__dirname_upload, '..', 'uploads', 'reservations');
 const incidentUploadDir = path.join(__dirname_upload, '..', 'uploads', 'incidents');
+const propertyUploadDir = path.join(__dirname_upload, '..', 'uploads', 'properties');
 
 // Ensure upload directory exists
 if (!fs.existsSync(uploadDir)) {
@@ -358,6 +359,9 @@ if (!fs.existsSync(reservationUploadDir)) {
 }
 if (!fs.existsSync(incidentUploadDir)) {
   fs.mkdirSync(incidentUploadDir, { recursive: true });
+}
+if (!fs.existsSync(propertyUploadDir)) {
+  fs.mkdirSync(propertyUploadDir, { recursive: true });
 }
 
 // Serve uploaded files
@@ -525,6 +529,37 @@ const incidentUpload = multer({
   }
 });
 
+const propertyStorage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    const propertyDir = path.join(propertyUploadDir, req.params.propertyId);
+    if (!fs.existsSync(propertyDir)) {
+      fs.mkdirSync(propertyDir, { recursive: true });
+    }
+    cb(null, propertyDir);
+  },
+  filename: (req, file, cb) => {
+    const timestamp = Date.now();
+    const safeName = file.originalname.replace(/[^a-zA-Z0-9.-]/g, '_');
+    const rawType = req.body && req.body.type ? String(req.body.type) : 'document';
+    const safeType = rawType.replace(/[^a-zA-Z0-9_-]/g, '').toLowerCase() || 'document';
+    cb(null, `${safeType}-${timestamp}-${safeName}`);
+  }
+});
+
+const propertyUpload = multer({
+  storage: propertyStorage,
+  limits: { fileSize: 10 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    const allowed = ['.pdf', '.doc', '.docx', '.jpg', '.jpeg', '.png'];
+    const ext = path.extname(file.originalname).toLowerCase();
+    if (allowed.includes(ext)) {
+      cb(null, true);
+    } else {
+      cb(new Error('Tipo de archivo no permitido'));
+    }
+  }
+});
+
 app.post('/upload/guest/:guestId', guestUpload.single('file'), (req, res) => {
   if (!req.file) {
     return res.status(400).json({ error: 'No se ha subido ningun archivo' });
@@ -563,6 +598,23 @@ app.post('/upload/incident/:incidentId', incidentUpload.single('file'), (req, re
       originalName: req.file.originalname,
       size: req.file.size,
       path: `/uploads/incidents/${req.params.incidentId}/${req.file.filename}`
+    }
+  });
+});
+
+app.post('/upload/property/:propertyId', propertyUpload.single('file'), (req, res) => {
+  if (!req.file) {
+    return res.status(400).json({ error: 'No se ha subido ningun archivo' });
+  }
+  const rawType = req.body && req.body.type ? String(req.body.type) : 'document';
+  const safeType = rawType.replace(/[^a-zA-Z0-9_-]/g, '').toLowerCase() || 'document';
+  res.json({
+    file: {
+      filename: req.file.filename,
+      originalName: req.file.originalname,
+      size: req.file.size,
+      type: safeType,
+      path: `/uploads/properties/${req.params.propertyId}/${req.file.filename}`
     }
   });
 });
@@ -647,9 +699,52 @@ app.get('/files/incident/:incidentId', (req, res) => {
   }
 });
 
+app.get('/files/property/:propertyId', (req, res) => {
+  const propertyDir = path.join(propertyUploadDir, req.params.propertyId);
+  if (!fs.existsSync(propertyDir)) {
+    return res.json({ files: [] });
+  }
+
+  try {
+    const files = fs.readdirSync(propertyDir)
+      .filter(name => !name.startsWith('.'))
+      .map(name => {
+        const filePath = path.join(propertyDir, name);
+        const stats = fs.statSync(filePath);
+        const parts = name.split('-');
+        const type = parts.length > 2 ? parts[0] : 'document';
+        return {
+          filename: name,
+          size: stats.size,
+          uploadDate: stats.mtime.toISOString(),
+          type,
+          path: `/uploads/properties/${req.params.propertyId}/${name}`
+        };
+      });
+    res.json({ files });
+  } catch (err) {
+    res.status(500).json({ error: 'No se pudo listar archivos' });
+  }
+});
+
 app.delete('/files/incident/:incidentId/:filename', (req, res) => {
   const incidentDir = path.join(incidentUploadDir, req.params.incidentId);
   const filePath = path.join(incidentDir, req.params.filename);
+
+  try {
+    if (!fs.existsSync(filePath)) {
+      return res.status(404).json({ error: 'Archivo no encontrado' });
+    }
+    fs.unlinkSync(filePath);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: 'No se pudo eliminar el archivo' });
+  }
+});
+
+app.delete('/files/property/:propertyId/:filename', (req, res) => {
+  const propertyDir = path.join(propertyUploadDir, req.params.propertyId);
+  const filePath = path.join(propertyDir, req.params.filename);
 
   try {
     if (!fs.existsSync(filePath)) {

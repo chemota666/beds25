@@ -12,6 +12,37 @@ export const Properties: React.FC = () => {
   const [showNewOwnerForm, setShowNewOwnerForm] = useState(false);
   const [newOwnerName, setNewOwnerName] = useState('');
   const [creatingOwner, setCreatingOwner] = useState(false);
+  type PropertyDocType = 'insurance' | 'electricity' | 'water' | 'internet' | 'gas' | 'management';
+  const PROPERTY_DOCS: Array<{ type: PropertyDocType; label: string }> = [
+    { type: 'insurance', label: 'Seguro' },
+    { type: 'electricity', label: 'Luz' },
+    { type: 'water', label: 'Agua' },
+    { type: 'internet', label: 'Internet' },
+    { type: 'gas', label: 'Gas' },
+    { type: 'management', label: 'Contrato Gestión' }
+  ];
+  interface PropertyFileInfo {
+    filename: string;
+    size: number;
+    uploadDate: string;
+    path: string;
+    type?: string;
+  }
+  const createEmptyDocMap = () => PROPERTY_DOCS.reduce((acc, doc) => {
+    acc[doc.type] = [];
+    return acc;
+  }, {} as Record<PropertyDocType, PropertyFileInfo[]>);
+  const createEmptyFlagMap = (value: boolean) => PROPERTY_DOCS.reduce((acc, doc) => {
+    acc[doc.type] = value;
+    return acc;
+  }, {} as Record<PropertyDocType, boolean>);
+  const createEmptyErrorMap = () => PROPERTY_DOCS.reduce((acc, doc) => {
+    acc[doc.type] = null;
+    return acc;
+  }, {} as Record<PropertyDocType, string | null>);
+  const [propertyFiles, setPropertyFiles] = useState<Record<PropertyDocType, PropertyFileInfo[]>>(createEmptyDocMap);
+  const [docUploading, setDocUploading] = useState<Record<PropertyDocType, boolean>>(() => createEmptyFlagMap(false));
+  const [docError, setDocError] = useState<Record<PropertyDocType, string | null>>(createEmptyErrorMap);
 
   // Load properties and owners
   useEffect(() => {
@@ -105,6 +136,94 @@ export const Properties: React.FC = () => {
     }
   };
 
+  const isNewProperty = editingProperty && String(editingProperty.id).startsWith('temp_');
+
+  const getDocTypeFromFilename = (filename: string): PropertyDocType | null => {
+    const first = filename.split('-')[0] || '';
+    const match = PROPERTY_DOCS.find(doc => doc.type === first);
+    return match ? match.type : null;
+  };
+
+  const loadPropertyFiles = async (propertyId: string) => {
+    try {
+      const response = await fetch(`/api/files/property/${propertyId}`);
+      if (!response.ok) {
+        setPropertyFiles(createEmptyDocMap());
+        return;
+      }
+      const data = await response.json();
+      const files = Array.isArray(data?.files) ? data.files : [];
+      const mapped = createEmptyDocMap();
+      files.forEach((file: PropertyFileInfo) => {
+        const type = (file.type as PropertyDocType) || getDocTypeFromFilename(file.filename) || null;
+        if (type && mapped[type]) {
+          mapped[type].push(file);
+        }
+      });
+      setPropertyFiles(mapped);
+    } catch (error: any) {
+      setPropertyFiles(createEmptyDocMap());
+    }
+  };
+
+  const handlePropertyDocUpload = async (type: PropertyDocType, file: File) => {
+    if (!editingProperty) return;
+    const propertyId = String(editingProperty.id || '');
+    if (!propertyId || propertyId.startsWith('temp_')) {
+      alert('Guarda el inmueble antes de subir documentos.');
+      return;
+    }
+    setDocUploading(prev => ({ ...prev, [type]: true }));
+    setDocError(prev => ({ ...prev, [type]: null }));
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('type', type);
+      const response = await fetch(`/api/upload/property/${propertyId}`, {
+        method: 'POST',
+        body: formData
+      });
+      if (!response.ok) {
+        const err = await response.json().catch(() => ({}));
+        throw new Error(err.error || 'Error al subir documento');
+      }
+      await loadPropertyFiles(propertyId);
+    } catch (error: any) {
+      setDocError(prev => ({ ...prev, [type]: error?.message || 'Error al subir documento' }));
+    } finally {
+      setDocUploading(prev => ({ ...prev, [type]: false }));
+    }
+  };
+
+  const handlePropertyDocDelete = async (type: PropertyDocType, filename: string) => {
+    if (!editingProperty) return;
+    if (!confirm('¿Eliminar este archivo?')) return;
+    const propertyId = String(editingProperty.id || '');
+    try {
+      const response = await fetch(`/api/files/property/${propertyId}/${encodeURIComponent(filename)}`, {
+        method: 'DELETE'
+      });
+      if (!response.ok && response.status !== 404) {
+        const err = await response.json().catch(() => ({}));
+        throw new Error(err.error || 'No se pudo eliminar el archivo');
+      }
+      await loadPropertyFiles(propertyId);
+    } catch (error: any) {
+      setDocError(prev => ({ ...prev, [type]: error?.message || 'Error al eliminar el archivo' }));
+    }
+  };
+
+  useEffect(() => {
+    if (!isPropertyModalOpen || !editingProperty) return;
+    const propertyId = String(editingProperty.id || '');
+    if (!propertyId || propertyId.startsWith('temp_')) {
+      setPropertyFiles(createEmptyDocMap());
+      setDocError(createEmptyErrorMap());
+      return;
+    }
+    loadPropertyFiles(propertyId);
+  }, [isPropertyModalOpen, editingProperty?.id]);
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -155,14 +274,14 @@ export const Properties: React.FC = () => {
 
       {isPropertyModalOpen && editingProperty && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden">
              <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
                 <h2 className="text-xl font-bold text-gray-800">Inmueble</h2>
                 <button onClick={() => setIsPropertyModalOpen(false)} className="p-2 hover:bg-gray-100 rounded-full">
                   <svg className="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path></svg>
                 </button>
              </div>
-             <form onSubmit={handleSaveProperty} className="p-6 space-y-4">
+             <form onSubmit={handleSaveProperty} className="p-6 space-y-4 max-h-[80vh] overflow-y-auto">
                 <div>
                   <label className="block text-xs font-semibold text-gray-500 uppercase mb-1">Nombre Inmueble</label>
                   <input 
@@ -264,6 +383,64 @@ export const Properties: React.FC = () => {
                     required type="number" className="w-full bg-gray-50 border border-gray-200 rounded-lg p-2 outline-none focus:ring-2 focus:ring-blue-500" 
                     value={editingProperty.numRooms} onChange={e => setEditingProperty({...editingProperty, numRooms: Number(e.target.value)})}
                   />
+                </div>
+
+                <div className="space-y-3 pt-2">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-xs font-black text-gray-600 uppercase tracking-widest">Documentos del inmueble</h3>
+                    {isNewProperty && (
+                      <span className="text-[10px] text-gray-400">Guarda el inmueble antes de subir documentos.</span>
+                    )}
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    {PROPERTY_DOCS.map(doc => (
+                      <div key={doc.type} className="border border-gray-200 rounded-xl p-3 bg-gray-50">
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-xs font-bold text-gray-700 uppercase">{doc.label}</span>
+                        </div>
+                        <input
+                          type="file"
+                          disabled={isNewProperty || docUploading[doc.type]}
+                          accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (file) handlePropertyDocUpload(doc.type, file);
+                            e.currentTarget.value = '';
+                          }}
+                          className="w-full text-xs text-gray-600 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+                        />
+                        {docUploading[doc.type] && (
+                          <p className="text-[11px] text-blue-600 mt-1">Subiendo...</p>
+                        )}
+                        {docError[doc.type] && (
+                          <p className="text-[11px] text-red-600 mt-1">{docError[doc.type]}</p>
+                        )}
+                        {propertyFiles[doc.type]?.length > 0 && (
+                          <div className="mt-2 space-y-1">
+                            {propertyFiles[doc.type].map(file => (
+                              <div key={file.filename} className="flex items-center justify-between gap-2">
+                                <a
+                                  className="text-[11px] font-semibold text-blue-700 hover:underline truncate"
+                                  href={`/api${file.path}`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                >
+                                  {file.filename}
+                                </a>
+                                <button
+                                  type="button"
+                                  onClick={() => handlePropertyDocDelete(doc.type, file.filename)}
+                                  className="text-[10px] font-bold text-red-600 hover:underline"
+                                >
+                                  Borrar
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
                 </div>
                 <div className="pt-4 flex justify-end space-x-3">
                   <button type="button" onClick={() => setIsPropertyModalOpen(false)} className="px-4 py-2 text-gray-600 font-semibold hover:bg-gray-100 rounded-lg">Cancelar</button>
