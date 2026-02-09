@@ -118,7 +118,7 @@ export default function DocumentUpload({ ownerId }: DocumentUploadProps) {
                 </svg>
                 <div>
                   <a
-                    href={`/uploads/owners/${ownerId}/${file.filename}`}
+                    href={`/api/uploads/owners/${ownerId}/${file.filename}`}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="text-sm text-blue-600 hover:underline"
