@@ -602,20 +602,28 @@ app.post('/upload/incident/:incidentId', incidentUpload.single('file'), (req, re
   });
 });
 
-app.post('/upload/property/:propertyId', propertyUpload.single('file'), (req, res) => {
-  if (!req.file) {
-    return res.status(400).json({ error: 'No se ha subido ningun archivo' });
-  }
-  const rawType = req.body && req.body.type ? String(req.body.type) : 'document';
-  const safeType = rawType.replace(/[^a-zA-Z0-9_-]/g, '').toLowerCase() || 'document';
-  res.json({
-    file: {
-      filename: req.file.filename,
-      originalName: req.file.originalname,
-      size: req.file.size,
-      type: safeType,
-      path: `/uploads/properties/${req.params.propertyId}/${req.file.filename}`
+const propertyUploadSingle = propertyUpload.single('file');
+
+app.post('/upload/property/:propertyId', (req, res) => {
+  propertyUploadSingle(req, res, (err) => {
+    if (err) {
+      console.error('Property upload error:', err && err.message ? err.message : err);
+      return res.status(400).json({ error: err && err.message ? err.message : 'Error al subir documento' });
     }
+    if (!req.file) {
+      return res.status(400).json({ error: 'No se ha subido ningun archivo' });
+    }
+    const rawType = req.body && req.body.type ? String(req.body.type) : 'document';
+    const safeType = rawType.replace(/[^a-zA-Z0-9_-]/g, '').toLowerCase() || 'document';
+    res.json({
+      file: {
+        filename: req.file.filename,
+        originalName: req.file.originalname,
+        size: req.file.size,
+        type: safeType,
+        path: `/uploads/properties/${req.params.propertyId}/${req.file.filename}`
+      }
+    });
   });
 });
 
