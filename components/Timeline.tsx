@@ -79,6 +79,22 @@ export const Timeline: React.FC<TimelineProps> = ({ rooms, reservations, propert
     }
   };
 
+  const rowBackgrounds = useMemo(() => {
+    const map: Record<string, string> = {};
+    let lastPropertyId: string | null = null;
+    let isGray = false;
+
+    rooms.forEach((room) => {
+      if (room.propertyId !== lastPropertyId) {
+        isGray = !isGray;
+        lastPropertyId = room.propertyId;
+      }
+      map[room.id] = isGray ? 'bg-gray-50' : 'bg-white';
+    });
+
+    return map;
+  }, [rooms]);
+
   return (
     <div className="bg-white rounded-xl shadow-md border border-gray-200 overflow-hidden select-none">
       <div className="flex border-b border-gray-300 bg-gray-100">
@@ -102,8 +118,8 @@ export const Timeline: React.FC<TimelineProps> = ({ rooms, reservations, propert
 
       <div className="max-h-[600px] overflow-y-auto">
         {rooms.map((room) => (
-          <div key={room.id} className="flex border-b border-gray-100 group relative">
-            <div className="w-64 flex-shrink-0 p-3 text-sm font-medium text-gray-700 border-r border-gray-300 bg-gray-50 flex flex-col justify-center">
+          <div key={room.id} className={`flex border-b border-gray-100 group relative ${rowBackgrounds[room.id] || 'bg-white'}`}>
+            <div className={`w-64 flex-shrink-0 p-3 text-sm font-medium text-gray-700 border-r border-gray-300 flex flex-col justify-center ${rowBackgrounds[room.id] || 'bg-white'}`}>
               {isAllProperties && (
                 <span className="text-[10px] text-blue-600 uppercase font-bold truncate">
                   {getPropertyName(room.propertyId)}
@@ -116,7 +132,7 @@ export const Timeline: React.FC<TimelineProps> = ({ rooms, reservations, propert
               {days.map((day, idx) => (
                 <div 
                   key={idx} 
-                  className={`flex-shrink-0 w-14 border-r border-gray-100 cursor-pointer hover:bg-blue-50 transition-colors ${
+                  className={`flex-shrink-0 w-14 border-r border-gray-100 cursor-pointer hover:bg-blue-50 transition-colors ${rowBackgrounds[room.id] || 'bg-white'} ${
                     isToday(day) ? 'bg-blue-50/30' : ''
                   }`}
                   onClick={() => onCellClick(room.id, day)}
