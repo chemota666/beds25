@@ -204,6 +204,15 @@ export const db = {
   },
 
   deleteGuest: async (id: string) => {
+    try {
+      const all = await mysqlApi.fetchData('reservations');
+      const hasRes = all.some((r: Reservation) => String(r.guestId) === String(id));
+      if (hasRes) {
+        throw new Error('No se puede eliminar un huésped con reservas. Primero elimina reservas y facturas.');
+      }
+    } catch (err) {
+      if (err && err.message && err.message.includes('No se puede eliminar')) throw err;
+    }
     await mysqlApi.deleteData('guests', id);
   },
 
@@ -238,7 +247,16 @@ export const db = {
 
   getInvoices: async (): Promise<Invoice[]> => [],
   saveInvoice: async (inv: Invoice) => {},
-  deleteInvoice: async (id: string) => {},
+  deleteInvoice: async (reservationId: string) => {
+    const response = await fetch(`/api/invoices/${reservationId}`, {
+      method: 'DELETE'
+    });
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}));
+      throw new Error(err.error || 'No se pudo eliminar la factura');
+    }
+    return await response.json().catch(() => ({}));
+  },
 
   // OWNERS CRUD
   getOwners: async (): Promise<Owner[]> => {
@@ -316,6 +334,7 @@ export const db = {
     if (incident.id && !String(incident.id).startsWith('temp_')) {
       await mysqlApi.updateData('incidents', String(incident.id), payload);
     } else {
+      if (payload.id) delete payload.id;
       await mysqlApi.insertData('incidents', payload);
     }
   },

@@ -194,6 +194,9 @@ export const Guests: React.FC = () => {
 
   const smartDownload = async (data: string, filename: string) => {
     if (!data) return;
+    const fallbackBase = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
+      ? 'https://n8n-contabo.ddns.net:8444'
+      : '';
     // Si es URL (Drive o uploads), abrir en nueva pestaña
     if (data.startsWith('http')) {
       try {
@@ -216,7 +219,8 @@ export const Guests: React.FC = () => {
         try {
           const url = new URL(data);
           if (url.pathname.startsWith('/uploads/')) {
-            window.open(`${url.origin}/api${url.pathname}`, '_blank');
+            const localUrl = `${url.origin}/api${url.pathname}`;
+            window.open(localUrl, '_blank');
           } else {
             window.open(data, '_blank');
           }
@@ -237,7 +241,11 @@ export const Guests: React.FC = () => {
         a.click();
         URL.revokeObjectURL(blobUrl);
       } catch {
-        window.open(`/api${data}`, '_blank');
+        if (fallbackBase) {
+          window.open(`${fallbackBase}/api${data}`, '_blank');
+        } else {
+          window.open(`/api${data}`, '_blank');
+        }
       }
     } else {
       // Es base64

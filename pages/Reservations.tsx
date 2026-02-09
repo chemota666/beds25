@@ -19,6 +19,7 @@ export const Reservations: React.FC = () => {
   const [startDate, setStartDate] = useState<string>('');
   const [endDate, setEndDate] = useState<string>('');
   const [sortBy, setSortBy] = useState<'date' | 'amount' | 'guest'>('date');
+  const [paymentFilter, setPaymentFilter] = useState<'all' | 'pending' | 'transfer' | 'cash' | 'cash_pending_delivery'>('all');
 
   // Modal
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -112,6 +113,16 @@ export const Reservations: React.FC = () => {
       const resStart = new Date(res.startDate);
       const filterEnd = new Date(endDate);
       if (resStart > filterEnd) return false;
+    }
+
+    // Filtro por estado de cobro
+    if (paymentFilter !== 'all') {
+      if (paymentFilter === 'pending' && res.paymentMethod !== 'pending') return false;
+      if (paymentFilter === 'transfer' && res.paymentMethod !== 'transfer') return false;
+      if (paymentFilter === 'cash' && res.paymentMethod !== 'cash') return false;
+      if (paymentFilter === 'cash_pending_delivery') {
+        if (res.paymentMethod !== 'cash' || res.cashDelivered) return false;
+      }
     }
 
     return true;
@@ -323,7 +334,7 @@ export const Reservations: React.FC = () => {
 
       {/* Filtros */}
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 space-y-4">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4">
           {/* Propietario */}
           <div>
             <label className="block text-xs font-bold text-gray-400 uppercase mb-2">Propietario</label>
@@ -397,6 +408,22 @@ export const Reservations: React.FC = () => {
               <option value="guest">Huésped (A-Z)</option>
             </select>
           </div>
+
+          {/* Estado de cobro */}
+          <div>
+            <label className="block text-xs font-bold text-gray-400 uppercase mb-2">Estado de cobro</label>
+            <select
+              value={paymentFilter}
+              onChange={(e) => setPaymentFilter(e.target.value as any)}
+              className="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="all">Todas</option>
+              <option value="pending">Pendientes de cobro</option>
+              <option value="transfer">Abonadas banco</option>
+              <option value="cash">Abonado efectivo</option>
+              <option value="cash_pending_delivery">Efectivo pendiente de entrega</option>
+            </select>
+          </div>
         </div>
 
         {/* Botón Limpiar filtros */}
@@ -414,6 +441,7 @@ export const Reservations: React.FC = () => {
               setStartDate('');
               setEndDate('');
               setSortBy('date');
+              setPaymentFilter('all');
             }}
             className="text-xs font-bold text-gray-500 hover:text-gray-700 uppercase"
           >

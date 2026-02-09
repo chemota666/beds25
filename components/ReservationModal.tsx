@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Room, Reservation, Guest, Property, PaymentMethod } from '../types';
 import { db } from '../services/db';
 
@@ -28,6 +28,8 @@ export const ReservationModal: React.FC<ReservationModalProps> = ({ rooms: initi
   const [newGuest, setNewGuest] = useState({ name: '', surname: '', dni: '' });
   const [receiptUploading, setReceiptUploading] = useState(false);
   const [receiptError, setReceiptError] = useState<string | null>(null);
+  const [canDeleteInvoice, setCanDeleteInvoice] = useState(false);
+  const roomSyncAttempted = useRef<Set<string>>(new Set());
 
   const normalizeAmount = (value?: number | string) => {
     if (value === undefined || value === null || value === '') return 0;
@@ -118,17 +120,26 @@ export const ReservationModal: React.FC<ReservationModalProps> = ({ rooms: initi
         return;
       }
       try {
-        const propRooms = await db.getRooms(String(formData.propertyId));
+        const propId = String(formData.propertyId);
+        let propRooms = await db.getRooms(propId);
+        if (!propRooms.length) {
+          const prop = allProperties.find(p => String(p.id) === propId);
+          if (prop && Number(prop.numRooms) > 0 && !roomSyncAttempted.current.has(propId)) {
+            roomSyncAttempted.current.add(propId);
+            await db.saveProperty({ ...prop });
+            propRooms = await db.getRooms(propId);
+          }
+        }
         setModalRooms(propRooms);
       } catch {
         setModalRooms(safeRooms);
       }
     };
     loadRoomsForProperty();
-  }, [formData.propertyId, safeRooms]);
+  }, [formData.propertyId, safeRooms, allProperties]);
 
   const availableRooms = useMemo(() => {
-    return modalRooms.filter(r => r.propertyId === formData.propertyId);
+    return modalRooms.filter(r => String(r.propertyId) === String(formData.propertyId));
   }, [formData.propertyId, modalRooms]);
 
   useEffect(() => {
@@ -265,6 +276,44 @@ export const ReservationModal: React.FC<ReservationModalProps> = ({ rooms: initi
 
   const canUploadReceipt = formData.id && !String(formData.id).startsWith('temp_');
 
+  const parseInvoiceSeq = (value?: string) => {
+    if (!value) return null;
+    const part = value.split('/').pop();
+    const num = part ? Number(part) : NaN;
+    return Number.isFinite(num) ? num : null;
+  };
+
+  useEffect(() => {
+    const computeCanDelete = async () => {
+      if (!formData.invoiceNumber || !formData.propertyId) {
+        setCanDeleteInvoice(false);
+        return;
+      }
+      try {
+        const ownerId = allProperties.find(p => String(p.id) === String(formData.propertyId))?.owner;
+        if (!ownerId) {
+          setCanDeleteInvoice(false);
+          return;
+        }
+        const seq = parseInvoiceSeq(formData.invoiceNumber);
+        if (!seq) {
+          setCanDeleteInvoice(false);
+          return;
+        }
+        const allRes = await db.getReservations();
+        const maxSeq = allRes
+          .filter(r => r.invoiceNumber && String(r.invoiceNumber).startsWith(`${ownerId}/`))
+          .map(r => parseInvoiceSeq(r.invoiceNumber))
+          .filter((n): n is number => typeof n === 'number')
+          .reduce((max, n) => Math.max(max, n), 0);
+        setCanDeleteInvoice(seq === maxSeq);
+      } catch {
+        setCanDeleteInvoice(false);
+      }
+    };
+    computeCanDelete();
+  }, [formData.invoiceNumber, formData.propertyId, allProperties]);
+
   const extractReceiptFilename = (value: string) => {
     if (!value) return null;
     try {
@@ -342,6 +391,23 @@ export const ReservationModal: React.FC<ReservationModalProps> = ({ rooms: initi
       setReceiptError(error?.message || 'Error al eliminar el justificante');
     } finally {
       setReceiptUploading(false);
+    }
+  };
+
+  const handleDeleteInvoice = async () => {
+    if (!formData.id || String(formData.id).startsWith('temp_')) return;
+    if (!formData.invoiceNumber) return;
+    if (!confirm('¿Eliminar la última factura de esta serie?')) return;
+    try {
+      setLoading(true);
+      await db.deleteInvoice(String(formData.id));
+      const updatedRes = { ...(formData as Reservation), invoiceNumber: undefined, invoiceDate: undefined };
+      setFormData(updatedRes);
+      onReservationUpdated?.(updatedRes);
+    } catch (error: any) {
+      alert(error?.message || 'No se pudo eliminar la factura');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -557,7 +623,10 @@ export const ReservationModal: React.FC<ReservationModalProps> = ({ rooms: initi
                {initialReservation && (
                  <>
                    <button type="button" onClick={() => onDelete(initialReservation.id)} className="text-red-500 text-sm font-bold hover:underline">Eliminar</button>
-                   <button type="button" onClick={handleCopyToNextMonth} className="text-blue-600 text-sm font-bold hover:underline">Copiar mes</button>
+                  <button type="button" onClick={handleCopyToNextMonth} className="text-blue-600 text-sm font-bold hover:underline">Copiar mes siguiente</button>
+                  {formData.invoiceNumber && canDeleteInvoice && (
+                    <button type="button" onClick={handleDeleteInvoice} className="text-orange-600 text-sm font-bold hover:underline">Eliminar factura</button>
+                  )}
                  </>
                )}
             </div>

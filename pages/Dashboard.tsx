@@ -11,7 +11,12 @@ export const Dashboard: React.FC = () => {
   const [rooms, setRooms] = useState<Room[]>([]);
   const [reservations, setReservations] = useState<Reservation[]>([]);
   const [startDate, setStartDate] = useState<string>(new Date().toISOString().split('T')[0]);
-  const [rangeMonths, setRangeMonths] = useState<number>(1);
+  const [rangeMonths, setRangeMonths] = useState<number>(2);
+  const [cellWidth, setCellWidth] = useState<number>(() => {
+    const saved = localStorage.getItem('roomflow_calendar_cellWidth');
+    const parsed = saved ? parseInt(saved, 10) : 56;
+    return Number.isFinite(parsed) ? Math.min(88, Math.max(40, parsed)) : 56;
+  });
   const [loading, setLoading] = useState(true);
   
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -25,6 +30,24 @@ export const Dashboard: React.FC = () => {
     };
     loadProperties();
   }, []);
+
+  useEffect(() => {
+    const savedRange = localStorage.getItem('roomflow_calendar_rangeMonths');
+    if (savedRange) {
+      const parsed = parseInt(savedRange, 10);
+      if (Number.isFinite(parsed)) {
+        setRangeMonths(Math.min(12, Math.max(1, parsed)));
+      }
+    }
+  }, []);
+
+  useEffect(() => {
+    localStorage.setItem('roomflow_calendar_rangeMonths', String(rangeMonths));
+  }, [rangeMonths]);
+
+  useEffect(() => {
+    localStorage.setItem('roomflow_calendar_cellWidth', String(cellWidth));
+  }, [cellWidth]);
 
   useEffect(() => {
     const loadData = async () => {
@@ -133,6 +156,13 @@ export const Dashboard: React.FC = () => {
     setStartDate(formatLocalDate(d));
   };
 
+  const adjustZoom = (delta: number) => {
+    setCellWidth(prev => {
+      const next = Math.min(88, Math.max(40, prev + delta));
+      return next;
+    });
+  };
+
   const activeRoomsCount = rooms.length;
   const currentOccupied = reservations.filter(r => {
     const today = new Date();
@@ -225,23 +255,46 @@ export const Dashboard: React.FC = () => {
                    <option value="12">12 meses</option>
                  </select>
                </div>
+                <div>
+                  <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Zoom</label>
+                  <div className="flex items-center bg-white border border-gray-200 rounded-lg overflow-hidden">
+                    <button
+                      type="button"
+                      onClick={() => adjustZoom(-4)}
+                      className="px-3 py-2 text-gray-600 hover:bg-gray-50"
+                      title="Reducir"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 11H9" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-4.35-4.35" /><circle cx="11" cy="11" r="7" strokeWidth="2" /></svg>
+                    </button>
+                    <div className="px-3 py-2 text-xs font-bold text-gray-600">{cellWidth}px</div>
+                    <button
+                      type="button"
+                      onClick={() => adjustZoom(4)}
+                      className="px-3 py-2 text-gray-600 hover:bg-gray-50"
+                      title="Ampliar"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v8m-4-4h8" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-4.35-4.35" /><circle cx="11" cy="11" r="7" strokeWidth="2" /></svg>
+                    </button>
+                  </div>
+                </div>
+                <div className="flex items-end">
+                  <div className="flex items-center space-x-4">
+                    <div className="flex items-center space-x-1.5">
+                      <span className="w-3 h-3 rounded bg-blue-500"></span>
+                      <span className="text-xs font-bold text-gray-500 uppercase">Banco</span>
+                    </div>
+                    <div className="flex items-center space-x-1.5">
+                      <span className="w-3 h-3 rounded bg-green-500"></span>
+                      <span className="text-xs font-bold text-gray-500 uppercase">Efectivo</span>
+                    </div>
+                    <div className="flex items-center space-x-1.5">
+                      <span className="w-3 h-3 rounded bg-yellow-400"></span>
+                      <span className="text-xs font-bold text-gray-500 uppercase">Pendiente</span>
+                    </div>
+                  </div>
+                </div>
              </div>
            </div>
-
-           <div className="flex items-center space-x-4">
-                <div className="flex items-center space-x-1.5">
-                  <span className="w-3 h-3 rounded bg-blue-500"></span>
-                  <span className="text-xs font-bold text-gray-500 uppercase">Banco</span>
-                </div>
-                <div className="flex items-center space-x-1.5">
-                  <span className="w-3 h-3 rounded bg-green-500"></span>
-                  <span className="text-xs font-bold text-gray-500 uppercase">Efectivo</span>
-                </div>
-                <div className="flex items-center space-x-1.5">
-                  <span className="w-3 h-3 rounded bg-yellow-400"></span>
-                  <span className="text-xs font-bold text-gray-500 uppercase">Pendiente</span>
-                </div>
-             </div>
             </div>
 
         <Timeline 
@@ -250,6 +303,7 @@ export const Dashboard: React.FC = () => {
           properties={properties}
           startDate={startDateObj}
           daysToShow={daysToShow}
+          cellWidth={cellWidth}
           onCellClick={handleCellClick}
           onReservationClick={handleReservationClick}
           isAllProperties={selectedPropertyId === 'all'}

@@ -9,6 +9,7 @@ interface TimelineProps {
   properties: Property[];
   startDate: Date;
   daysToShow: number;
+  cellWidth: number;
   onCellClick: (roomId: string, date: Date) => void;
   onReservationClick: (res: Reservation) => void;
   isAllProperties: boolean;
@@ -20,12 +21,18 @@ const paymentColors: Record<PaymentMethod, string> = {
   'cash': 'bg-green-500 text-white border-green-600',
 };
 
-export const Timeline: React.FC<TimelineProps> = ({ rooms, reservations, properties, startDate, daysToShow, onCellClick, onReservationClick, isAllProperties }) => {
+export const Timeline: React.FC<TimelineProps> = ({ rooms, reservations, properties, startDate, daysToShow, cellWidth, onCellClick, onReservationClick, isAllProperties }) => {
   const [guests, setGuests] = useState<Guest[]>([]);
 
   const parseLocalDate = (value: string) => {
     if (!value) return new Date('');
-    return value.includes('T') ? new Date(value) : new Date(`${value}T00:00:00`);
+    if (value.includes('T')) {
+      const datePart = value.split('T')[0];
+      const [y, m, d] = datePart.split('-').map(Number);
+      return new Date(y || 0, (m || 1) - 1, d || 1, 12, 0, 0, 0);
+    }
+    const [y, m, d] = value.split('-').map(Number);
+    return new Date(y || 0, (m || 1) - 1, d || 1, 12, 0, 0, 0);
   };
   
   // FIX: Handled async call to db.getGuests() correctly within useEffect
@@ -89,7 +96,7 @@ export const Timeline: React.FC<TimelineProps> = ({ rooms, reservations, propert
         isGray = !isGray;
         lastPropertyId = room.propertyId;
       }
-      map[room.id] = isGray ? 'bg-gray-50' : 'bg-white';
+      map[room.id] = isGray ? 'bg-gray-100' : 'bg-white';
     });
 
     return map;
@@ -105,7 +112,8 @@ export const Timeline: React.FC<TimelineProps> = ({ rooms, reservations, propert
           {days.map((day, idx) => (
             <div 
               key={idx} 
-              className={`flex-shrink-0 w-14 border-r border-gray-200 p-2 text-center text-xs font-semibold ${
+              style={{ width: `${cellWidth}px` }}
+              className={`flex-shrink-0 border-r border-gray-200 p-2 text-center text-xs font-semibold ${
                 isToday(day) ? 'bg-blue-600 text-white' : 'text-gray-500'
               }`}
             >
@@ -132,7 +140,8 @@ export const Timeline: React.FC<TimelineProps> = ({ rooms, reservations, propert
               {days.map((day, idx) => (
                 <div 
                   key={idx} 
-                  className={`flex-shrink-0 w-14 border-r border-gray-100 cursor-pointer hover:bg-blue-50 transition-colors ${rowBackgrounds[room.id] || 'bg-white'} ${
+                  style={{ width: `${cellWidth}px` }}
+                  className={`flex-shrink-0 border-r border-gray-100 cursor-pointer hover:bg-blue-50 transition-colors ${rowBackgrounds[room.id] || 'bg-white'} ${
                     isToday(day) ? 'bg-blue-50/30' : ''
                   }`}
                   onClick={() => onCellClick(room.id, day)}
@@ -159,10 +168,10 @@ export const Timeline: React.FC<TimelineProps> = ({ rooms, reservations, propert
                     <div
                       key={res.id}
                       onClick={(e) => { e.stopPropagation(); onReservationClick(res); }}
-                      className={`absolute top-2 h-12 rounded shadow-sm border px-2 py-1 cursor-pointer transition-all hover:brightness-95 z-10 overflow-hidden ${paymentColors[res.paymentMethod] || 'bg-gray-500'}`}
+                      className={`absolute top-2 h-12 rounded-xl shadow-sm border px-2 py-1 cursor-pointer transition-all hover:brightness-95 z-10 overflow-hidden ${paymentColors[res.paymentMethod] || 'bg-gray-500'}`}
                       style={{
-                        left: `${adjustedStart * 56}px`,
-                        width: `${adjustedWidth * 56 - 4}px`,
+                        left: `${adjustedStart * cellWidth + 2}px`,
+                        width: `${adjustedWidth * cellWidth - 6}px`,
                       }}
                       title={`${getGuestDisplayName(res.guestId)}: ${res.notes || 'Sin notas'}`}
                     >

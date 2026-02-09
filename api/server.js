@@ -282,6 +282,27 @@ app.put('/:table/:id', async (req, res) => {
 app.delete('/:table/:id', async (req, res) => {
   try {
     if (!pool) await ensurePool();
+
+    // Prevent deleting guests with reservations or invoices
+    if (req.params.table === 'guests') {
+      try {
+        const [countRows] = await pool.query(
+          'SELECT COUNT(*) AS cnt FROM `reservations` WHERE guestId = ? AND (invoiceNumber IS NULL OR invoiceNumber = "")',
+          [req.params.id]
+        );
+        const [invoiceRows] = await pool.query(
+          'SELECT COUNT(*) AS cnt FROM `reservations` WHERE guestId = ? AND (invoiceNumber IS NOT NULL AND invoiceNumber <> "")',
+          [req.params.id]
+        );
+        const pendingCnt = countRows && countRows[0] ? Number(countRows[0].cnt) : 0;
+        const invoicedCnt = invoiceRows && invoiceRows[0] ? Number(invoiceRows[0].cnt) : 0;
+        if (pendingCnt > 0 || invoicedCnt > 0) {
+          return res.status(400).json({ error: 'No se puede eliminar un huésped con reservas. Primero elimina reservas y facturas.' });
+        }
+      } catch (e) {
+        console.error('Error checking guest reservations before delete:', e && e.message ? e.message : e);
+      }
+    }
     // Prevent deletion of invoiced reservations at API level
     if (req.params.table === 'reservations') {
       // Debugging: log the reservation row before attempting deletion
@@ -777,6 +798,66 @@ app.post('/invoices/generate', async (req, res) => {
   } catch (err) {
     console.error('Invoice generation error:', err && err.message ? err.message : err);
     res.status(500).json({ error: err && err.message ? err.message : err });
+  }
+});
+
+// DELETE endpoint to remove the last invoice in a series (by reservation)
+app.delete('/invoices/:reservationId', async (req, res) => {
+  const reservationId = String(req.params.reservationId);
+  if (!reservationId) return res.status(400).json({ error: 'ReservationId requerido' });
+
+  let conn;
+  try {
+    if (!pool) await ensurePool();
+    conn = await pool.getConnection();
+    await conn.beginTransaction();
+
+    const [rrows] = await conn.query(
+      'SELECT r.id, r.invoiceNumber, p.owner FROM `reservations` r JOIN `properties` p ON r.propertyId = p.id WHERE r.id = ? FOR UPDATE',
+      [reservationId]
+    );
+    const r = rrows && rrows[0];
+    if (!r || !r.invoiceNumber) {
+      await conn.rollback();
+      return res.status(400).json({ error: 'La reserva no tiene factura' });
+    }
+
+    const ownerId = r.owner;
+    const series = String(ownerId);
+    const invoiceNumber = String(r.invoiceNumber);
+    const seqPart = invoiceNumber.split('/').pop() || '';
+    const seq = Number(seqPart);
+    if (!Number.isFinite(seq) || seq <= 0) {
+      await conn.rollback();
+      return res.status(400).json({ error: 'Número de factura inválido' });
+    }
+
+    const [maxInvoiceRows] = await conn.query(
+      'SELECT MAX(CAST(SUBSTRING_INDEX(r.invoiceNumber, "/", -1) AS UNSIGNED)) AS maxSeq FROM `reservations` r JOIN `properties` p ON r.propertyId = p.id WHERE p.owner = ? AND r.invoiceNumber IS NOT NULL AND r.invoiceNumber <> "" AND r.invoiceNumber LIKE ? FOR UPDATE',
+      [ownerId, `${series}/%`]
+    );
+    const maxSeq = maxInvoiceRows && maxInvoiceRows[0] && maxInvoiceRows[0].maxSeq ? Number(maxInvoiceRows[0].maxSeq) : 0;
+
+    if (seq !== maxSeq) {
+      await conn.rollback();
+      return res.status(400).json({ error: 'Solo se puede eliminar la última factura de la serie' });
+    }
+
+    // Delete invoice record and clear reservation invoice fields
+    await conn.query('DELETE FROM `invoices` WHERE reservationId = ? OR `number` = ?', [reservationId, invoiceNumber]);
+    await conn.query('UPDATE `reservations` SET invoiceNumber = NULL, invoiceDate = NULL WHERE id = ?', [reservationId]);
+
+    const nextLast = Math.max(0, maxSeq - 1);
+    await conn.query('UPDATE `owners` SET lastInvoiceNumber = ? WHERE id = ?', [nextLast, ownerId]);
+
+    await conn.commit();
+    res.json({ success: true, lastInvoiceNumber: nextLast });
+  } catch (err) {
+    if (conn) try { await conn.rollback(); } catch (_) {}
+    console.error('Invoice delete error:', err && err.message ? err.message : err);
+    res.status(500).json({ error: err && err.message ? err.message : 'Error al eliminar factura' });
+  } finally {
+    if (conn) conn.release();
   }
 });
 
