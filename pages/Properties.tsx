@@ -177,9 +177,9 @@ export const Properties: React.FC = () => {
     setDocError(prev => ({ ...prev, [type]: null }));
     try {
       const formData = new FormData();
-      formData.append('file', file);
       formData.append('type', type);
-      const response = await fetch(`/api/upload/property/${propertyId}`, {
+      formData.append('file', file);
+      const response = await fetch(`/api/upload/property/${propertyId}?type=${encodeURIComponent(type)}`,
         method: 'POST',
         body: formData
       });

@@ -540,7 +540,8 @@ const propertyStorage = multer.diskStorage({
   filename: (req, file, cb) => {
     const timestamp = Date.now();
     const safeName = file.originalname.replace(/[^a-zA-Z0-9.-]/g, '_');
-    const rawType = req.body && req.body.type ? String(req.body.type) : 'document';
+    const rawType = (req.query && req.query.type ? String(req.query.type) : '')
+      || (req.body && req.body.type ? String(req.body.type) : 'document');
     const safeType = rawType.replace(/[^a-zA-Z0-9_-]/g, '').toLowerCase() || 'document';
     cb(null, `${safeType}-${timestamp}-${safeName}`);
   }
@@ -613,7 +614,8 @@ app.post('/upload/property/:propertyId', (req, res) => {
     if (!req.file) {
       return res.status(400).json({ error: 'No se ha subido ningun archivo' });
     }
-    const rawType = req.body && req.body.type ? String(req.body.type) : 'document';
+    const rawType = (req.query && req.query.type ? String(req.query.type) : '')
+      || (req.body && req.body.type ? String(req.body.type) : 'document');
     const safeType = rawType.replace(/[^a-zA-Z0-9_-]/g, '').toLowerCase() || 'document';
     res.json({
       file: {
