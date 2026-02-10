@@ -179,7 +179,7 @@ export const Properties: React.FC = () => {
       const formData = new FormData();
       formData.append('type', type);
       formData.append('file', file);
-      const response = await fetch(`/api/upload/property/${propertyId}?type=${encodeURIComponent(type)}`,
+      const response = await fetch(`/api/upload/property/${propertyId}?type=${encodeURIComponent(type)}`, {
         method: 'POST',
         body: formData
       });
