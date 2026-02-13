@@ -1,12 +1,14 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { db } from '../services/db';
-import { Guest, Sex, Reservation } from '../types';
+import { Guest, Sex, Reservation, Property, Room } from '../types';
 
 type GuestDocField = 'dniFile' | 'contractFile' | 'depositReceiptFile';
 
 export const Guests: React.FC = () => {
   const [guests, setGuests] = useState<Guest[]>([]);
+  const [properties, setProperties] = useState<Property[]>([]);
+  const [rooms, setRooms] = useState<Room[]>([]);
   const [editingGuest, setEditingGuest] = useState<Guest | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
@@ -28,8 +30,14 @@ export const Guests: React.FC = () => {
   useEffect(() => {
     const loadGuests = async () => {
       setLoading(true);
-      const data = await db.getGuests();
-      setGuests(data);
+      const [guestData, propertyData, roomData] = await Promise.all([
+        db.getGuests(),
+        db.getProperties(),
+        db.getRooms()
+      ]);
+      setGuests(guestData);
+      setProperties(propertyData);
+      setRooms(roomData);
       setLoading(false);
     };
     loadGuests();
@@ -257,6 +265,10 @@ export const Guests: React.FC = () => {
   };
 
   const isNewGuest = editingGuest && String(editingGuest.id).startsWith('temp_');
+  const roomsForDefaultProperty = useMemo(() => {
+    if (!editingGuest?.defaultPropertyId) return [];
+    return rooms.filter(r => String(r.propertyId) === String(editingGuest.defaultPropertyId));
+  }, [rooms, editingGuest?.defaultPropertyId]);
 
   return (
     <div className="space-y-6">
@@ -277,6 +289,8 @@ export const Guests: React.FC = () => {
                 nationality: 'Española', 
                 sex: 'Masculino', 
                 isRegistered: false,
+                defaultPropertyId: '',
+                defaultRoomId: '',
                 email: '',
                 phone: '',
                 notes: ''
@@ -499,6 +513,47 @@ export const Guests: React.FC = () => {
                      <div className="space-y-1">
                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Email</label>
                        <input type="email" className="w-full bg-white border border-gray-200 rounded-xl p-3 font-bold text-gray-800 focus:ring-4 focus:ring-blue-50 outline-none transition-all" value={editingGuest.email || ''} onChange={e => setEditingGuest({...editingGuest, email: e.target.value})} />
+                     </div>
+                   </div>
+
+                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 p-6 bg-blue-50 rounded-2xl border border-blue-100">
+                     <div className="space-y-1">
+                       <label className="text-[10px] font-black text-blue-500 uppercase tracking-widest ml-1">Inmueble predeterminado</label>
+                       <select
+                         className="w-full bg-white border border-blue-200 rounded-xl p-3 font-bold text-gray-800 focus:ring-4 focus:ring-blue-50 outline-none transition-all"
+                         value={editingGuest.defaultPropertyId || ''}
+                         onChange={e => {
+                           const nextPropertyId = e.target.value;
+                           const nextRooms = rooms.filter(r => String(r.propertyId) === String(nextPropertyId));
+                           const nextRoomId = nextRooms.find(r => String(r.id) === String(editingGuest.defaultRoomId))
+                             ? editingGuest.defaultRoomId
+                             : (nextRooms[0]?.id || '');
+                           setEditingGuest({
+                             ...editingGuest,
+                             defaultPropertyId: nextPropertyId,
+                             defaultRoomId: nextPropertyId ? (nextRoomId || '') : ''
+                           });
+                         }}
+                       >
+                         <option value="">Sin asignar</option>
+                         {properties.map(p => (
+                           <option key={p.id} value={p.id}>{p.name}</option>
+                         ))}
+                       </select>
+                     </div>
+                     <div className="space-y-1">
+                       <label className="text-[10px] font-black text-blue-500 uppercase tracking-widest ml-1">Habitación predeterminada</label>
+                       <select
+                         className="w-full bg-white border border-blue-200 rounded-xl p-3 font-bold text-gray-800 focus:ring-4 focus:ring-blue-50 outline-none transition-all"
+                         value={editingGuest.defaultRoomId || ''}
+                         disabled={!editingGuest.defaultPropertyId}
+                         onChange={e => setEditingGuest({ ...editingGuest, defaultRoomId: e.target.value })}
+                       >
+                         <option value="">Sin asignar</option>
+                         {roomsForDefaultProperty.map(r => (
+                           <option key={r.id} value={r.id}>{r.name}</option>
+                         ))}
+                       </select>
                      </div>
                    </div>
 

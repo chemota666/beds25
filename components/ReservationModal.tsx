@@ -153,6 +153,19 @@ export const ReservationModal: React.FC<ReservationModalProps> = ({ rooms: initi
     [allGuests, formData.guestId]
   );
 
+  useEffect(() => {
+    if (initialReservation) return;
+    if (!formData.propertyId || !formData.roomId) return;
+    if (formData.guestId) return;
+    const defaultGuest = allGuests.find(g =>
+      String(g.defaultPropertyId || '') === String(formData.propertyId) &&
+      String(g.defaultRoomId || '') === String(formData.roomId)
+    );
+    if (defaultGuest) {
+      setFormData(prev => ({ ...prev, guestId: defaultGuest.id }));
+    }
+  }, [allGuests, formData.propertyId, formData.roomId, formData.guestId, initialReservation]);
+
   const filteredGuests = useMemo(() => {
     if (!searchTerm) return [];
     const lower = searchTerm.toLowerCase();

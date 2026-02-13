@@ -15,6 +15,8 @@ export interface Guest extends AuditFields {
   nationality: string;
   sex: Sex;
   isRegistered: boolean; // Empadronado
+  defaultPropertyId?: string;
+  defaultRoomId?: string;
   email?: string;
   phone?: string;
   notes?: string;
