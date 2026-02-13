@@ -148,6 +148,11 @@ export const ReservationModal: React.FC<ReservationModalProps> = ({ rooms: initi
     setFormData(prev => ({ ...prev, roomId: availableRooms[0].id }));
   }, [availableRooms, formData.roomId]);
 
+  const activeGuests = useMemo(
+    () => allGuests.filter(g => !g.archived),
+    [allGuests]
+  );
+
   const selectedGuest = useMemo(() => 
     allGuests.find(g => g.id === formData.guestId), 
     [allGuests, formData.guestId]
@@ -157,24 +162,24 @@ export const ReservationModal: React.FC<ReservationModalProps> = ({ rooms: initi
     if (initialReservation) return;
     if (!formData.propertyId || !formData.roomId) return;
     if (formData.guestId) return;
-    const defaultGuest = allGuests.find(g =>
+    const defaultGuest = activeGuests.find(g =>
       String(g.defaultPropertyId || '') === String(formData.propertyId) &&
       String(g.defaultRoomId || '') === String(formData.roomId)
     );
     if (defaultGuest) {
       setFormData(prev => ({ ...prev, guestId: defaultGuest.id }));
     }
-  }, [allGuests, formData.propertyId, formData.roomId, formData.guestId, initialReservation]);
+  }, [activeGuests, formData.propertyId, formData.roomId, formData.guestId, initialReservation]);
 
   const filteredGuests = useMemo(() => {
     if (!searchTerm) return [];
     const lower = searchTerm.toLowerCase();
-    return allGuests.filter(g => 
+    return activeGuests.filter(g => 
       g.name.toLowerCase().includes(lower) || 
       g.surname.toLowerCase().includes(lower) ||
       g.dni.toLowerCase().includes(lower)
     ).slice(0, 5);
-  }, [allGuests, searchTerm]);
+  }, [activeGuests, searchTerm]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -267,7 +272,8 @@ export const ReservationModal: React.FC<ReservationModalProps> = ({ rooms: initi
         dni: newGuest.dni.trim(),
         nationality: 'Española',
         sex: 'Masculino',
-        isRegistered: false
+        isRegistered: false,
+        archived: false
       };
       await db.saveGuest(guestToSave);
       const updatedGuests = await db.getGuests();

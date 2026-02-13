@@ -9,6 +9,7 @@ export const Properties: React.FC = () => {
   const [managers, setManagers] = useState<Manager[]>([]);
   const [editingProperty, setEditingProperty] = useState<Property | null>(null);
   const [isPropertyModalOpen, setIsPropertyModalOpen] = useState(false);
+  const [listTab, setListTab] = useState<'active' | 'archived'>('active');
   const [showNewOwnerForm, setShowNewOwnerForm] = useState(false);
   const [newOwnerName, setNewOwnerName] = useState('');
   const [creatingOwner, setCreatingOwner] = useState(false);
@@ -50,7 +51,7 @@ export const Properties: React.FC = () => {
       const props = await db.getProperties();
       const ownersList = await db.getOwners();
       const managersList = await db.getManagers();
-      setProperties(props);
+      setProperties(props.map(p => ({ ...p, archived: Boolean(p.archived) })));
       setOwners(ownersList);
       setManagers(managersList);
     };
@@ -63,7 +64,7 @@ export const Properties: React.FC = () => {
       try {
         await db.saveProperty(editingProperty);
         const props = await db.getProperties();
-        setProperties(props);
+        setProperties(props.map(p => ({ ...p, archived: Boolean(p.archived) })));
         setIsPropertyModalOpen(false);
         setEditingProperty(null);
         alert('Inmueble guardado correctamente');
@@ -81,7 +82,8 @@ export const Properties: React.FC = () => {
       city: '',
       owner: owners.length > 0 ? String(owners[0].id) : '',
       managerId: managers.length > 0 ? String(managers[0].id) : '',
-      numRooms: 0
+      numRooms: 0,
+      archived: false
     });
     setShowNewOwnerForm(false);
     setIsPropertyModalOpen(true);
@@ -91,7 +93,19 @@ export const Properties: React.FC = () => {
     if (confirm('¿Estás seguro de que quieres eliminar este inmueble y todas sus habitaciones?')) {
       await db.deleteProperty(id);
       const props = await db.getProperties();
-      setProperties(props);
+      setProperties(props.map(p => ({ ...p, archived: Boolean(p.archived) })));
+    }
+  };
+
+  const handleToggleArchive = async (property: Property, archived: boolean) => {
+    try {
+      const updated = { ...property, archived };
+      await db.saveProperty(updated as Property);
+      const props = await db.getProperties();
+      setProperties(props.map(p => ({ ...p, archived: Boolean(p.archived) })));
+      setEditingProperty(updated as Property);
+    } catch (error: any) {
+      alert('Error al actualizar inmueble: ' + (error?.message || 'Error desconocido'));
     }
   };
 
@@ -224,6 +238,12 @@ export const Properties: React.FC = () => {
     loadPropertyFiles(propertyId);
   }, [isPropertyModalOpen, editingProperty?.id]);
 
+  const activeProperties = properties.filter(p => !p.archived);
+  const archivedProperties = properties.filter(p => p.archived);
+  const activeCount = activeProperties.length;
+  const archivedCount = archivedProperties.length;
+  const visibleProperties = listTab === 'active' ? activeProperties : archivedProperties;
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -239,8 +259,29 @@ export const Properties: React.FC = () => {
         </button>
       </div>
 
+      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 flex flex-wrap items-center gap-3">
+        <button
+          type="button"
+          onClick={() => setListTab('active')}
+          className={`px-4 py-2 rounded-xl border text-xs font-black uppercase tracking-widest transition-all ${
+            listTab === 'active' ? 'bg-blue-50 border-blue-200 text-blue-700' : 'bg-white border-gray-200 text-gray-500 hover:text-gray-700'
+          }`}
+        >
+          Inmuebles Activos ({activeCount})
+        </button>
+        <button
+          type="button"
+          onClick={() => setListTab('archived')}
+          className={`px-4 py-2 rounded-xl border text-xs font-black uppercase tracking-widest transition-all ${
+            listTab === 'archived' ? 'bg-gray-100 border-gray-300 text-gray-700' : 'bg-white border-gray-200 text-gray-500 hover:text-gray-700'
+          }`}
+        >
+          Inmuebles Archivados ({archivedCount})
+        </button>
+      </div>
+
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {properties.map(p => {
+        {visibleProperties.map(p => {
           const ownerData = owners.find(o => String(o.id) === String(p.owner));
           const managerData = managers.find(m => String(m.id) === String(p.managerId));
           return (
@@ -250,7 +291,7 @@ export const Properties: React.FC = () => {
                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path></svg>
                  </div>
                  <div className="flex space-x-1">
-                    <button onClick={() => { setEditingProperty(p); setShowNewOwnerForm(false); setIsPropertyModalOpen(true); }} className="p-2 text-gray-400 hover:text-blue-600">
+                    <button onClick={() => { setEditingProperty({ ...p, archived: Boolean(p.archived) }); setShowNewOwnerForm(false); setIsPropertyModalOpen(true); }} className="p-2 text-gray-400 hover:text-blue-600">
                       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg>
                     </button>
                     <button onClick={() => handleDeleteProperty(p.id)} className="p-2 text-gray-400 hover:text-red-600">
@@ -442,9 +483,24 @@ export const Properties: React.FC = () => {
                     ))}
                   </div>
                 </div>
-                <div className="pt-4 flex justify-end space-x-3">
-                  <button type="button" onClick={() => setIsPropertyModalOpen(false)} className="px-4 py-2 text-gray-600 font-semibold hover:bg-gray-100 rounded-lg">Cancelar</button>
-                  <button type="submit" className="px-6 py-2 bg-blue-600 text-white font-semibold rounded-lg shadow-md hover:bg-blue-700">Guardar</button>
+                <div className="pt-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                  <div>
+                    {!isNewProperty && (
+                      <button
+                        type="button"
+                        onClick={() => handleToggleArchive(editingProperty, !editingProperty.archived)}
+                        className={`px-4 py-2 rounded-lg text-sm font-semibold ${
+                          editingProperty.archived ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-gray-100 text-gray-700 border border-gray-200'
+                        }`}
+                      >
+                        {editingProperty.archived ? 'Activar inmueble' : 'Archivar inmueble'}
+                      </button>
+                    )}
+                  </div>
+                  <div className="flex justify-end space-x-3">
+                    <button type="button" onClick={() => setIsPropertyModalOpen(false)} className="px-4 py-2 text-gray-600 font-semibold hover:bg-gray-100 rounded-lg">Cancelar</button>
+                    <button type="submit" className="px-6 py-2 bg-blue-600 text-white font-semibold rounded-lg shadow-md hover:bg-blue-700">Guardar</button>
+                  </div>
                 </div>
              </form>
           </div>

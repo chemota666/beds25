@@ -14,6 +14,7 @@ export const Guests: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(true);
   const [guestReservations, setGuestReservations] = useState<Reservation[]>([]);
+  const [listTab, setListTab] = useState<'active' | 'archived'>('active');
   const [activeTab, setActiveTab] = useState<'datos' | 'historial' | 'documentos'>('datos');
   const [showIncompleteOnly, setShowIncompleteOnly] = useState(false);
   const [docUploading, setDocUploading] = useState<Record<GuestDocField, boolean>>({
@@ -35,7 +36,11 @@ export const Guests: React.FC = () => {
         db.getProperties(),
         db.getRooms()
       ]);
-      setGuests(guestData);
+      const normalizedGuests = guestData.map((g: Guest) => ({
+        ...g,
+        archived: Boolean(g.archived)
+      }));
+      setGuests(normalizedGuests);
       setProperties(propertyData);
       setRooms(roomData);
       setLoading(false);
@@ -65,10 +70,20 @@ export const Guests: React.FC = () => {
 
   const completeCount = useMemo(() => guests.filter(isGuestDocsComplete).length, [guests]);
   const incompleteCount = useMemo(() => guests.length - completeCount, [guests, completeCount]);
+  const activeGuestsList = useMemo(() => guests.filter(g => !g.archived), [guests]);
+  const archivedGuestsList = useMemo(() => guests.filter(g => g.archived), [guests]);
+  const activeCount = useMemo(() => activeGuestsList.length, [activeGuestsList]);
+  const archivedCount = useMemo(() => archivedGuestsList.length, [archivedGuestsList]);
+  const activeCompleteCount = useMemo(() => activeGuestsList.filter(isGuestDocsComplete).length, [activeGuestsList]);
+  const activeIncompleteCount = useMemo(() => activeCount - activeCompleteCount, [activeCount, activeCompleteCount]);
+  const archivedCompleteCount = useMemo(() => archivedGuestsList.filter(isGuestDocsComplete).length, [archivedGuestsList]);
+  const archivedIncompleteCount = useMemo(() => archivedCount - archivedCompleteCount, [archivedCount, archivedCompleteCount]);
 
   const filteredGuests = useMemo(() => {
     const lower = searchTerm.toLowerCase();
     return guests.filter(g => {
+      if (listTab === 'active' && g.archived) return false;
+      if (listTab === 'archived' && !g.archived) return false;
       if (showIncompleteOnly && isGuestDocsComplete(g)) return false;
       return (
         g.name.toLowerCase().includes(lower) || 
@@ -80,7 +95,7 @@ export const Guests: React.FC = () => {
       const idB = parseInt(b.id) || 0;
       return idA - idB;
     });
-  }, [guests, searchTerm, showIncompleteOnly]);
+  }, [guests, searchTerm, showIncompleteOnly, listTab]);
 
   const handleSaveGuest = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -112,6 +127,19 @@ export const Guests: React.FC = () => {
   const updateGuestInState = (updated: Guest) => {
     setEditingGuest(updated);
     setGuests(prev => prev.map(g => String(g.id) === String(updated.id) ? { ...g, ...updated } : g));
+  };
+
+  const handleToggleArchive = async (guest: Guest, archived: boolean) => {
+    try {
+      setLoading(true);
+      const updated = { ...guest, archived };
+      await db.saveGuest(updated as Guest);
+      updateGuestInState(updated as Guest);
+    } catch (error: any) {
+      alert('❌ Error al actualizar estado del huésped: ' + (error?.message || 'Error desconocido'));
+    } finally {
+      setLoading(false);
+    }
   };
 
   const getGuestId = () => String(editingGuest?.id || '');
@@ -289,6 +317,7 @@ export const Guests: React.FC = () => {
                 nationality: 'Española', 
                 sex: 'Masculino', 
                 isRegistered: false,
+                archived: false,
                 defaultPropertyId: '',
                 defaultRoomId: '',
                 email: '',
@@ -319,13 +348,35 @@ export const Guests: React.FC = () => {
           <div className="flex flex-wrap items-center gap-3">
             <button
               type="button"
+              onClick={() => setListTab('active')}
+              className={`px-4 py-2 rounded-xl border text-xs font-black uppercase tracking-widest transition-all ${
+                listTab === 'active' ? 'bg-blue-50 border-blue-200 text-blue-700' : 'bg-white border-gray-200 text-gray-500 hover:text-gray-700'
+              }`}
+              title="Ver huéspedes activos"
+            >
+              Huéspedes Activos ({activeCount})
+            </button>
+            <button
+              type="button"
+              onClick={() => setListTab('archived')}
+              className={`px-4 py-2 rounded-xl border text-xs font-black uppercase tracking-widest transition-all ${
+                listTab === 'archived' ? 'bg-gray-100 border-gray-300 text-gray-700' : 'bg-white border-gray-200 text-gray-500 hover:text-gray-700'
+              }`}
+              title="Ver huéspedes archivados"
+            >
+              Huéspedes Archivados ({archivedCount})
+            </button>
+          </div>
+          <div className="flex flex-wrap items-center gap-3">
+            <button
+              type="button"
               onClick={() => setShowIncompleteOnly(false)}
               className={`px-4 py-2 rounded-xl border text-xs font-black uppercase tracking-widest transition-all ${
                 !showIncompleteOnly ? 'bg-green-50 border-green-200 text-green-700' : 'bg-white border-gray-200 text-gray-500 hover:text-gray-700'
               }`}
               title="Ver huéspedes con documentación completa"
             >
-              Docs completas: {completeCount}
+              Docs completas: {listTab === 'active' ? activeCompleteCount : archivedCompleteCount}
             </button>
             <button
               type="button"
@@ -335,7 +386,7 @@ export const Guests: React.FC = () => {
               }`}
               title="Ver huéspedes con documentación incompleta"
             >
-              Docs incompletas: {incompleteCount}
+              Docs incompletas: {listTab === 'active' ? activeIncompleteCount : archivedIncompleteCount}
             </button>
           </div>
           <input 
@@ -395,7 +446,8 @@ export const Guests: React.FC = () => {
                             ...g,
                             sex: g.sex || 'Masculino',
                             nationality: g.nationality || 'Española',
-                            isRegistered: g.isRegistered || false
+                            isRegistered: g.isRegistered || false,
+                            archived: Boolean(g.archived)
                           };
                           setEditingGuest(guestData);
                           setActiveTab('datos');
@@ -408,6 +460,21 @@ export const Guests: React.FC = () => {
                           alert('Error al abrir el formulario');
                         }
                       }} className="text-blue-600 font-bold text-xs uppercase tracking-wider hover:text-blue-800">Editar</button>
+                      {g.archived ? (
+                        <button
+                          onClick={() => handleToggleArchive(g, false)}
+                          className="text-emerald-600 font-bold text-xs uppercase tracking-wider hover:text-emerald-800"
+                        >
+                          Activar
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => handleToggleArchive(g, true)}
+                          className="text-gray-500 font-bold text-xs uppercase tracking-wider hover:text-gray-700"
+                        >
+                          Archivar
+                        </button>
+                      )}
                       <button onClick={async () => { if(confirm('¿Seguro que quieres eliminar este huésped?')) { setLoading(true); await db.deleteGuest(g.id); setGuests(await db.getGuests()); setLoading(false); } }} className="text-red-300 hover:text-red-600 font-bold text-xs uppercase tracking-wider transition-colors">Borrar</button>
                     </div>
                   </td>

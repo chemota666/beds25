@@ -10,7 +10,10 @@ export const Dashboard: React.FC = () => {
   const [selectedPropertyId, setSelectedPropertyId] = useState<string>('all');
   const [rooms, setRooms] = useState<Room[]>([]);
   const [reservations, setReservations] = useState<Reservation[]>([]);
-  const [startDate, setStartDate] = useState<string>(new Date().toISOString().split('T')[0]);
+  const [startDate, setStartDate] = useState<string>(() => {
+    const saved = localStorage.getItem('roomflow_calendar_startDate');
+    return saved || new Date().toISOString().split('T')[0];
+  });
   const [rangeMonths, setRangeMonths] = useState<number>(2);
   const [cellWidth, setCellWidth] = useState<number>(() => {
     const saved = localStorage.getItem('roomflow_calendar_cellWidth');
@@ -44,6 +47,12 @@ export const Dashboard: React.FC = () => {
   useEffect(() => {
     localStorage.setItem('roomflow_calendar_rangeMonths', String(rangeMonths));
   }, [rangeMonths]);
+
+  useEffect(() => {
+    if (startDate) {
+      localStorage.setItem('roomflow_calendar_startDate', startDate);
+    }
+  }, [startDate]);
 
   useEffect(() => {
     localStorage.setItem('roomflow_calendar_cellWidth', String(cellWidth));

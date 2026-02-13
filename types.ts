@@ -15,6 +15,7 @@ export interface Guest extends AuditFields {
   nationality: string;
   sex: Sex;
   isRegistered: boolean; // Empadronado
+  archived?: boolean;
   defaultPropertyId?: string;
   defaultRoomId?: string;
   email?: string;
@@ -35,6 +36,7 @@ export interface Property extends AuditFields {
   owner: string;
   managerId?: string;
   numRooms: number;
+  archived?: boolean;
   createdAt?: string;
   updatedAt?: string;
 }
