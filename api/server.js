@@ -616,10 +616,12 @@ app.get('/export/reservations', async (req, res) => {
         r.startDate         AS fecha_inicio,
         r.endDate           AS fecha_fin,
         DATEDIFF(r.endDate, r.startDate) AS noches,
-        p.name              AS propiedad,
+        p.id                AS propiedad_id,
+        p.name              AS propiedad_nombre,
         p.address           AS direccion_propiedad,
         p.city              AS ciudad,
-        rm.name             AS habitacion,
+        rm.id               AS habitacion_id,
+        rm.name             AS habitacion_nombre,
         g.name              AS huesped_nombre,
         g.surname           AS huesped_apellidos,
         g.dni               AS huesped_dni,
@@ -1781,7 +1783,7 @@ app.delete('/files/owner/:ownerId/:filename', (req, res) => {
 });
 
 const PORT = parseInt(process.env.API_PORT || '3003', 10);
-const HOST = process.env.API_HOST || '127.0.0.1';
+const HOST = process.env.API_HOST || '0.0.0.0';
 
 app.listen(PORT, HOST, () => {
   console.log(`API server running on ${HOST}:${PORT}`);
