@@ -41,12 +41,9 @@ export const Incidents: React.FC = () => {
   useEffect(() => {
     if (!editingIncident) return;
     if (!editingIncident.propertyId && properties.length > 0) {
-      setEditingIncident({
-        ...editingIncident,
-        propertyId: String(properties[0].id)
-      });
+      setEditingIncident(prev => prev ? { ...prev, propertyId: String(properties[0].id) } : prev);
     }
-  }, [properties, editingIncident]);
+  }, [properties, editingIncident?.propertyId]);
 
   const filteredIncidents = useMemo(() => {
     return incidents.filter(incident => {
@@ -109,8 +106,12 @@ export const Incidents: React.FC = () => {
 
   const handleDelete = async (id: string) => {
     if (!confirm('¿Seguro que quieres eliminar esta incidencia?')) return;
-    await db.deleteIncident(id);
-    await loadData();
+    try {
+      await db.deleteIncident(id);
+      await loadData();
+    } catch (err: any) {
+      alert(err?.message || 'Error al eliminar incidencia');
+    }
   };
 
   const totalAmount = useMemo(() => {
@@ -156,10 +157,14 @@ export const Incidents: React.FC = () => {
       updatedAt: new Date().toISOString()
     };
 
-    await db.saveIncident(toSave);
-    await loadData();
-    setIsModalOpen(false);
-    setEditingIncident(null);
+    try {
+      await db.saveIncident(toSave);
+      await loadData();
+      setIsModalOpen(false);
+      setEditingIncident(null);
+    } catch (err: any) {
+      alert(err?.message || 'Error al guardar incidencia');
+    }
   };
 
   const loadIncidentFiles = async (incidentId: string) => {

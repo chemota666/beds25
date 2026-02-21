@@ -1,0 +1,19 @@
+1. asegurarse que el servicio de los usuarios funciona. cuantos usuarios hay actualmente? crear el usuario maria@brickstarter.com con la contraseña Brickstarter
+
+
+2. Crear facturas.
+cuando una reserva se marca como pagada, se tiene que crear una factura por cada reserva qeu se marca como pagada. tiene que haber una serie de facturas por cada propietario, y las facturas tienen que ser correlativas, no puede haber saltos. de tal forma las reservas una vez facturadas no se deberían modificar. esta funcionalidad ya se implemento en una versión anterior, así que habrá mucho código ya implementado. antes de hacer nada, mira lo que hay ya implementado y hazme un resumen. hay reservas ya marcadas con abonadas, que habrá que hacerle la factura.
+
+
+
+
+
+3. crear un sistema de logs, de forma que se registreen todos los cambios. que se recoja la fecha, el usuario, y el cmabio que se ha hecho en la bbdd, lo más completo posible.
+quiero saber que es lo que hace cada empleado, cada dia. eso solo lo puede ver el admin. el usuario luis dale el rol de gestor
+
+
+4. descargar los contratos completados de la web. a partir de una plantilla
+
+
+
+5. crear un reporte para los propietarios.

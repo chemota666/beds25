@@ -167,11 +167,15 @@ export const Reservations: React.FC = () => {
   };
 
   const handleSaveReservation = async (updatedRes: Reservation) => {
-    await db.saveReservation(updatedRes);
-    const updated = await db.getReservations();
-    setReservations(updated);
-    setIsModalOpen(false);
-    setEditingReservation(null);
+    try {
+      await db.saveReservation(updatedRes);
+      const updated = await db.getReservations();
+      setReservations(updated);
+      setIsModalOpen(false);
+      setEditingReservation(null);
+    } catch (err: any) {
+      alert(err?.message || 'Error al guardar la reserva');
+    }
   };
 
   const handleReservationUpdated = (updatedRes: Reservation) => {
@@ -231,11 +235,15 @@ export const Reservations: React.FC = () => {
   })();
 
   const handleDeleteReservation = async (id: string) => {
-    await db.deleteReservation(id);
-    const updated = await db.getReservations();
-    setReservations(updated);
-    setIsModalOpen(false);
-    setEditingReservation(null);
+    try {
+      await db.deleteReservation(id);
+      const updated = await db.getReservations();
+      setReservations(updated);
+      setIsModalOpen(false);
+      setEditingReservation(null);
+    } catch (err: any) {
+      alert(err?.message || 'Error al eliminar la reserva');
+    }
   };
 
   const handleExportExcel = () => {
@@ -538,8 +546,24 @@ export const Reservations: React.FC = () => {
                           <span className="text-xs text-gray-400">-</span>
                         )}
                       </td>
-                      <td className="px-6 py-4 text-sm font-semibold text-gray-700">
-                        {paid ? (res.invoiceNumber || 'Sin factura') : '-'}
+                      <td className="px-6 py-4 text-sm font-semibold">
+                        {paid ? (
+                          res.invoiceNumber ? (
+                            <a
+                              href={`/api/invoices/${res.invoiceNumber.replace('/', '-')}/pdf`}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="text-blue-600 hover:underline"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              {res.invoiceNumber}
+                            </a>
+                          ) : (
+                            <span className="text-gray-400">Sin factura</span>
+                          )
+                        ) : (
+                          <span className="text-gray-400">-</span>
+                        )}
                       </td>
                       <td className="px-6 py-4 text-sm text-gray-500 truncate max-w-xs">{res.notes || '-'}</td>
                       <td className="px-6 py-4 text-center">

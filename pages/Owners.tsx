@@ -48,6 +48,8 @@ export const Owners: React.FC = () => {
       name: '',
       dni: '',
       phone: '',
+      email: '',
+      iban: '',
       invoiceSeries: '',
       lastInvoiceNumber: 0,
       taxId: '',
@@ -71,8 +73,13 @@ export const Owners: React.FC = () => {
   const handleDelete = async (id: string) => {
     if (confirm('¿Seguro que quieres eliminar este propietario?')) {
       setLoading(true);
-      await db.deleteOwner(id);
-      await loadOwners();
+      try {
+        await db.deleteOwner(id);
+        await loadOwners();
+      } catch (err: any) {
+        alert(err?.message || 'Error al eliminar propietario');
+        setLoading(false);
+      }
     }
   };
 
@@ -257,6 +264,16 @@ export const Owners: React.FC = () => {
                   <div className="space-y-1">
                     <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Teléfono</label>
                     <input type="tel" className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3 font-bold text-gray-800 focus:ring-4 focus:ring-blue-50 outline-none transition-all" value={editingOwner.phone || ''} onChange={e => setEditingOwner({...editingOwner, phone: e.target.value})} />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Email</label>
+                    <input type="email" className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3 font-bold text-gray-800 focus:ring-4 focus:ring-blue-50 outline-none transition-all" placeholder="correo@ejemplo.com" value={editingOwner.email || ''} onChange={e => setEditingOwner({...editingOwner, email: e.target.value})} />
+                  </div>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">IBAN</label>
+                    <input type="text" className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3 font-bold text-gray-800 focus:ring-4 focus:ring-blue-50 outline-none transition-all font-mono" placeholder="ES00 0000 0000 00 0000000000" value={editingOwner.iban || ''} onChange={e => setEditingOwner({...editingOwner, iban: e.target.value})} />
                   </div>
                 </div>
               </div>

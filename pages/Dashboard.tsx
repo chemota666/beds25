@@ -28,8 +28,12 @@ export const Dashboard: React.FC = () => {
 
   useEffect(() => {
     const loadProperties = async () => {
-      const props = await db.getProperties();
-      setProperties(props);
+      try {
+        const props = await db.getProperties();
+        setProperties(props);
+      } catch (err) {
+        console.error('Error loading properties:', err);
+      }
     };
     loadProperties();
   }, []);
@@ -61,16 +65,21 @@ export const Dashboard: React.FC = () => {
   useEffect(() => {
     const loadData = async () => {
       setLoading(true);
-      if (selectedPropertyId === 'all') {
-        const [allRooms, allRes] = await Promise.all([db.getRooms(), db.getReservations()]);
-        setRooms(allRooms);
-        setReservations(allRes);
-      } else {
-        const [propRooms, allRes] = await Promise.all([db.getRooms(selectedPropertyId), db.getReservations()]);
-        setRooms(propRooms);
-        setReservations(allRes.filter(r => String(r.propertyId) === String(selectedPropertyId)));
+      try {
+        if (selectedPropertyId === 'all') {
+          const [allRooms, allRes] = await Promise.all([db.getRooms(), db.getReservations()]);
+          setRooms(allRooms);
+          setReservations(allRes);
+        } else {
+          const [propRooms, allRes] = await Promise.all([db.getRooms(selectedPropertyId), db.getReservations()]);
+          setRooms(propRooms);
+          setReservations(allRes.filter(r => String(r.propertyId) === String(selectedPropertyId)));
+        }
+      } catch (err) {
+        console.error('Error loading calendar data:', err);
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
     };
     loadData();
   }, [selectedPropertyId]);

@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Room, Reservation, Guest, Property, PaymentMethod } from '../types';
 import { db } from '../services/db';
@@ -200,18 +199,22 @@ export const ReservationModal: React.FC<ReservationModalProps> = ({ rooms: initi
 
     try {
       setLoading(true);
+      if (new Date(formData.endDate!) < new Date(formData.startDate!)) {
+        alert('La fecha de salida no puede ser anterior a la fecha de entrada.');
+        return;
+      }
       const overbookResult = await db.checkOverbooking(resToSave);
       if (overbookResult.conflict && overbookResult.conflictingRes) {
         const conflicting = overbookResult.conflictingRes;
         const guest = allGuests.find(g => String(g.id) === String(conflicting.guestId));
         const guestName = guest ? `${guest.name} ${guest.surname}`.trim() : 'Desconocido';
-        setOverbookingError(`⚠️ CONFLICTO DE FECHAS\nLa habitación ya está ocupada\nReserva: ${guestName} (${new Date(conflicting.startDate).toLocaleDateString('es-ES')} - ${new Date(conflicting.endDate).toLocaleDateString('es-ES')})`);
-        setLoading(false);
+        setOverbookingError(`CONFLICTO DE FECHAS\nLa habitacion ya esta ocupada\nReserva: ${guestName} (${new Date(conflicting.startDate).toLocaleDateString('es-ES')} - ${new Date(conflicting.endDate).toLocaleDateString('es-ES')})`);
         return;
       }
       onSave(resToSave);
     } catch (error: any) {
-      alert('❌ Error al guardar la reserva: ' + (error?.message || 'Error desconocido'));
+      alert('Error al guardar la reserva: ' + (error?.message || 'Error desconocido'));
+    } finally {
       setLoading(false);
     }
   };
@@ -294,6 +297,7 @@ export const ReservationModal: React.FC<ReservationModalProps> = ({ rooms: initi
   };
 
   const canUploadReceipt = formData.id && !String(formData.id).startsWith('temp_');
+  const isInvoiced = !!formData.invoiceNumber;
 
   const parseInvoiceSeq = (value?: string) => {
     if (!value) return null;
@@ -320,8 +324,9 @@ export const ReservationModal: React.FC<ReservationModalProps> = ({ rooms: initi
           return;
         }
         const allRes = await db.getReservations();
+        const ownerSeries = `FR${String(ownerId).padStart(2, '0')}/`;
         const maxSeq = allRes
-          .filter(r => r.invoiceNumber && String(r.invoiceNumber).startsWith(`${ownerId}/`))
+          .filter(r => r.invoiceNumber && String(r.invoiceNumber).startsWith(ownerSeries))
           .map(r => parseInvoiceSeq(r.invoiceNumber))
           .filter((n): n is number => typeof n === 'number')
           .reduce((max, n) => Math.max(max, n), 0);
@@ -455,6 +460,13 @@ export const ReservationModal: React.FC<ReservationModalProps> = ({ rooms: initi
             </div>
           )}
 
+          {isInvoiced && (
+            <div className="bg-yellow-50 border border-yellow-200 text-yellow-700 p-3 rounded-xl text-sm font-semibold flex items-center gap-2">
+              <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
+              <span>Reserva facturada ({formData.invoiceNumber}). Los campos principales no se pueden modificar.</span>
+            </div>
+          )}
+
           <div className="bg-blue-50/50 p-4 rounded-xl border border-blue-100 relative">
             <label className="block text-xs font-bold text-blue-500 uppercase mb-2">Huésped</label>
             {selectedGuest ? (
@@ -466,7 +478,7 @@ export const ReservationModal: React.FC<ReservationModalProps> = ({ rooms: initi
                     <p className="text-xs text-gray-500">{selectedGuest.dni}</p>
                   </div>
                 </div>
-                {true && (
+                {!isInvoiced && (
                   <button type="button" onClick={() => setFormData({...formData, guestId: ''})} className="text-xs font-bold text-blue-600">Cambiar</button>
                 )}
               </div>
@@ -534,20 +546,22 @@ export const ReservationModal: React.FC<ReservationModalProps> = ({ rooms: initi
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
              <div>
               <label className="block text-xs font-bold text-gray-400 uppercase mb-1">Inmueble</label>
-              <select 
-                className="w-full bg-white border border-gray-300 rounded-lg p-2.5 outline-none"
+              <select
+                className={`w-full bg-white border border-gray-300 rounded-lg p-2.5 outline-none ${isInvoiced ? 'bg-gray-100 cursor-not-allowed opacity-60' : ''}`}
                 value={formData.propertyId}
                 onChange={e => setFormData({...formData, propertyId: e.target.value})}
+                disabled={isInvoiced}
               >
                 {allProperties.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
               </select>
             </div>
             <div>
               <label className="block text-xs font-bold text-gray-400 uppercase mb-1">Habitación</label>
-              <select 
-                className="w-full bg-white border border-gray-300 rounded-lg p-2.5 outline-none"
+              <select
+                className={`w-full bg-white border border-gray-300 rounded-lg p-2.5 outline-none ${isInvoiced ? 'bg-gray-100 cursor-not-allowed opacity-60' : ''}`}
                 value={formData.roomId}
                 onChange={e => setFormData({...formData, roomId: e.target.value})}
+                disabled={isInvoiced}
               >
                 {availableRooms.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
               </select>
@@ -557,32 +571,36 @@ export const ReservationModal: React.FC<ReservationModalProps> = ({ rooms: initi
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
              <div>
               <label className="block text-xs font-bold text-gray-400 uppercase mb-1">Entrada</label>
-              <input required type="date" className="w-full bg-white border border-gray-300 rounded-lg p-2.5 outline-none" value={formData.startDate} onChange={e => setFormData({...formData, startDate: e.target.value})} />
+              <input required type="date" className={`w-full bg-white border border-gray-300 rounded-lg p-2.5 outline-none ${isInvoiced ? 'bg-gray-100 cursor-not-allowed opacity-60' : ''}`} value={formData.startDate} onChange={e => setFormData({...formData, startDate: e.target.value})} disabled={isInvoiced} />
             </div>
             <div>
               <label className="block text-xs font-bold text-gray-400 uppercase mb-1">Salida</label>
-              <input required type="date" className="w-full bg-white border border-gray-300 rounded-lg p-2.5 outline-none" value={formData.endDate} onChange={e => setFormData({...formData, endDate: e.target.value})} />
+              <input required type="date" className={`w-full bg-white border border-gray-300 rounded-lg p-2.5 outline-none ${isInvoiced ? 'bg-gray-100 cursor-not-allowed opacity-60' : ''}`} value={formData.endDate} onChange={e => setFormData({...formData, endDate: e.target.value})} disabled={isInvoiced} />
             </div>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
              <div>
               <label className="block text-xs font-bold text-gray-400 uppercase mb-1">Importe Mensual (€)</label>
-              <input 
-                required 
-                type="number" 
-                className="w-full border rounded-lg p-2.5 outline-none" 
-                value={formData.amount ?? formData.price ?? 0} 
+              <input
+                required
+                type="number"
+                className={`w-full border rounded-lg p-2.5 outline-none ${isInvoiced ? 'bg-gray-100 cursor-not-allowed opacity-60' : ''}`}
+                value={formData.amount ?? formData.price ?? ''}
                 onChange={e => {
-                  const amountValue = normalizeAmount(e.target.value);
-                  setFormData({ ...formData, amount: amountValue, price: amountValue });
-                }} 
+                  const raw = e.target.value;
+                  const amountValue = raw === '' ? 0 : Number(raw);
+                  if (!isNaN(amountValue)) {
+                    setFormData({ ...formData, amount: amountValue, price: amountValue });
+                  }
+                }}
+                disabled={isInvoiced}
               />
             </div>
             <div>
               <label className="block text-xs font-bold text-gray-400 uppercase mb-1">Método de Pago</label>
-              <select 
-                className="w-full border rounded-lg p-2.5 outline-none font-bold"
+              <select
+                className={`w-full border rounded-lg p-2.5 outline-none font-bold ${isInvoiced ? 'bg-gray-100 cursor-not-allowed opacity-60' : ''}`}
                 value={formData.paymentMethod}
                 onChange={e => {
                   const nextMethod = e.target.value as PaymentMethod;
@@ -592,12 +610,24 @@ export const ReservationModal: React.FC<ReservationModalProps> = ({ rooms: initi
                     cashDelivered: nextMethod === 'cash' ? !!formData.cashDelivered : false
                   });
                 }}
+                disabled={isInvoiced}
               >
                 <option value="pending">Pendiente (No pagado)</option>
                 <option value="transfer">Banco (Pagado)</option>
                 <option value="cash">Efectivo (Pagado)</option>
               </select>
             </div>
+          </div>
+
+          <div>
+            <label className="block text-xs font-bold text-gray-400 uppercase mb-1">Notas</label>
+            <textarea
+              className="w-full border rounded-lg p-2.5 outline-none"
+              value={formData.notes || ''}
+              onChange={e => setFormData({ ...formData, notes: e.target.value })}
+              rows={3}
+              placeholder="Escribe aquí tus notas..."
+            />
           </div>
 
           <div className="bg-gray-50 border border-gray-100 rounded-xl p-4">
@@ -643,8 +673,80 @@ export const ReservationModal: React.FC<ReservationModalProps> = ({ rooms: initi
                  <>
                    <button type="button" onClick={() => onDelete(initialReservation.id)} className="text-red-500 text-sm font-bold hover:underline">Eliminar</button>
                   <button type="button" onClick={handleCopyToNextMonth} className="text-blue-600 text-sm font-bold hover:underline">Copiar mes siguiente</button>
+                  {isInvoiced && (
+                    <a
+                      href={`/api/invoices/${formData.invoiceNumber!.replace('/', '-')}/pdf`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-purple-600 text-sm font-bold hover:underline"
+                    >
+                      Ver factura PDF
+                    </a>
+                  )}
                   {formData.invoiceNumber && canDeleteInvoice && (
                     <button type="button" onClick={handleDeleteInvoice} className="text-orange-600 text-sm font-bold hover:underline">Eliminar factura</button>
+                  )}
+                  {formData.guestId && (
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        try {
+                          const resp = await fetch(`/api/contracts/generate/${initialReservation.id}`);
+                          if (!resp.ok) {
+                            const err = await resp.json().catch(() => ({ error: 'Error al generar contrato' }));
+                            alert(err.error || 'Error al generar contrato');
+                            return;
+                          }
+                          const blob = await resp.blob();
+                          const url = window.URL.createObjectURL(blob);
+                          const a = document.createElement('a');
+                          a.href = url;
+                          const disposition = resp.headers.get('Content-Disposition') || '';
+                          const match = disposition.match(/filename="?(.+?)"?$/);
+                          a.download = match ? match[1] : `contrato_${initialReservation.id}.docx`;
+                          document.body.appendChild(a);
+                          a.click();
+                          a.remove();
+                          window.URL.revokeObjectURL(url);
+                        } catch (e: any) {
+                          alert('Error al generar contrato: ' + (e.message || e));
+                        }
+                      }}
+                      className="text-green-700 text-sm font-bold hover:underline"
+                    >
+                      Generar Contrato
+                    </button>
+                  )}
+                  {formData.guestId && (
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        try {
+                          const resp = await fetch(`/api/empadronamiento/generate/${initialReservation.id}`);
+                          if (!resp.ok) {
+                            const err = await resp.json().catch(() => ({ error: 'Error al generar autorización' }));
+                            alert(err.error || 'Error al generar autorización');
+                            return;
+                          }
+                          const blob = await resp.blob();
+                          const url = window.URL.createObjectURL(blob);
+                          const a = document.createElement('a');
+                          a.href = url;
+                          const disposition = resp.headers.get('Content-Disposition') || '';
+                          const match = disposition.match(/filename="?(.+?)"?$/);
+                          a.download = match ? match[1] : `autorizacion_empadronamiento_${initialReservation.id}.docx`;
+                          document.body.appendChild(a);
+                          a.click();
+                          a.remove();
+                          window.URL.revokeObjectURL(url);
+                        } catch (e: any) {
+                          alert('Error al generar autorización: ' + (e.message || e));
+                        }
+                      }}
+                      className="text-teal-700 text-sm font-bold hover:underline"
+                    >
+                      Empadronamiento
+                    </button>
                   )}
                  </>
                )}

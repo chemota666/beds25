@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { db } from '../services/db';
 import { Guest, Sex, Reservation, Property, Room } from '../types';
+import { ReservationModal } from '../components/ReservationModal';
 
 type GuestDocField = 'dniFile' | 'contractFile' | 'depositReceiptFile';
 
@@ -27,6 +28,8 @@ export const Guests: React.FC = () => {
     contractFile: null,
     depositReceiptFile: null
   });
+  const [resModalOpen, setResModalOpen] = useState(false);
+  const [editingReservation, setEditingReservation] = useState<Reservation | null>(null);
 
   useEffect(() => {
     const loadGuests = async () => {
@@ -103,23 +106,15 @@ export const Guests: React.FC = () => {
       try {
         setLoading(true);
         await db.saveGuest(editingGuest);
-        // We force a small delay because Apps Script takes a moment to process Drive uploads
-        setTimeout(async () => {
-          try {
-            const data = await db.getGuests();
-            setGuests(data);
-            setLoading(false);
-            setIsModalOpen(false);
-            setEditingGuest(null);
-            alert('✅ Huésped guardado correctamente');
-          } catch (error: any) {
-            alert('❌ Error al cargar huéspedes: ' + (error?.message || 'Error desconocido'));
-            setLoading(false);
-          }
-        }, 1500);
+        const data = await db.getGuests();
+        setGuests(data);
+        setIsModalOpen(false);
+        setEditingGuest(null);
+        alert('✅ Huésped guardado correctamente');
       } catch (error: any) {
-        setLoading(false);
         alert('❌ Error al guardar huésped: ' + (error?.message || 'Error desconocido'));
+      } finally {
+        setLoading(false);
       }
     }
   };
@@ -344,55 +339,55 @@ export const Guests: React.FC = () => {
       </div>
 
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden relative">
-        <div className="p-4 border-b border-gray-50 bg-gray-50/50 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-          <div className="flex flex-wrap items-center gap-3">
-            <button
-              type="button"
-              onClick={() => setListTab('active')}
-              className={`px-4 py-2 rounded-xl border text-xs font-black uppercase tracking-widest transition-all ${
-                listTab === 'active' ? 'bg-blue-50 border-blue-200 text-blue-700' : 'bg-white border-gray-200 text-gray-500 hover:text-gray-700'
-              }`}
-              title="Ver huéspedes activos"
-            >
-              Huéspedes Activos ({activeCount})
-            </button>
-            <button
-              type="button"
-              onClick={() => setListTab('archived')}
-              className={`px-4 py-2 rounded-xl border text-xs font-black uppercase tracking-widest transition-all ${
-                listTab === 'archived' ? 'bg-gray-100 border-gray-300 text-gray-700' : 'bg-white border-gray-200 text-gray-500 hover:text-gray-700'
-              }`}
-              title="Ver huéspedes archivados"
-            >
-              Huéspedes Archivados ({archivedCount})
-            </button>
-          </div>
-          <div className="flex flex-wrap items-center gap-3">
-            <button
-              type="button"
-              onClick={() => setShowIncompleteOnly(false)}
-              className={`px-4 py-2 rounded-xl border text-xs font-black uppercase tracking-widest transition-all ${
-                !showIncompleteOnly ? 'bg-green-50 border-green-200 text-green-700' : 'bg-white border-gray-200 text-gray-500 hover:text-gray-700'
-              }`}
-              title="Ver huéspedes con documentación completa"
-            >
-              Docs completas: {listTab === 'active' ? activeCompleteCount : archivedCompleteCount}
-            </button>
-            <button
-              type="button"
-              onClick={() => setShowIncompleteOnly(true)}
-              className={`px-4 py-2 rounded-xl border text-xs font-black uppercase tracking-widest transition-all ${
-                showIncompleteOnly ? 'bg-yellow-50 border-yellow-200 text-yellow-700' : 'bg-white border-gray-200 text-gray-500 hover:text-gray-700'
-              }`}
-              title="Ver huéspedes con documentación incompleta"
-            >
-              Docs incompletas: {listTab === 'active' ? activeIncompleteCount : archivedIncompleteCount}
-            </button>
-          </div>
-          <input 
-            type="text" 
+        {/* Tabs Activos / Archivados */}
+        <div className="flex border-b border-gray-100">
+          <button
+            type="button"
+            onClick={() => setListTab('active')}
+            className={`flex-1 px-6 py-4 text-xs font-black uppercase tracking-widest transition-all border-b-2 ${
+              listTab === 'active'
+                ? 'border-blue-600 text-blue-600'
+                : 'border-transparent text-gray-400 hover:text-gray-600'
+            }`}
+          >
+            Huéspedes Activos ({activeCount})
+          </button>
+          <button
+            type="button"
+            onClick={() => setListTab('archived')}
+            className={`flex-1 px-6 py-4 text-xs font-black uppercase tracking-widest transition-all border-b-2 ${
+              listTab === 'archived'
+                ? 'border-blue-600 text-blue-600'
+                : 'border-transparent text-gray-400 hover:text-gray-600'
+            }`}
+          >
+            Huéspedes Archivados ({archivedCount})
+          </button>
+        </div>
+        {/* Filtros de documentación + búsqueda */}
+        <div className="p-4 border-b border-gray-50 bg-gray-50/50 flex flex-wrap items-center gap-3">
+          <button
+            type="button"
+            onClick={() => setShowIncompleteOnly(false)}
+            className={`px-4 py-2 rounded-xl border text-xs font-black uppercase tracking-widest transition-all ${
+              !showIncompleteOnly ? 'bg-green-50 border-green-200 text-green-700' : 'bg-white border-gray-200 text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            Docs completas: {listTab === 'active' ? activeCompleteCount : archivedCompleteCount}
+          </button>
+          <button
+            type="button"
+            onClick={() => setShowIncompleteOnly(true)}
+            className={`px-4 py-2 rounded-xl border text-xs font-black uppercase tracking-widest transition-all ${
+              showIncompleteOnly ? 'bg-yellow-50 border-yellow-200 text-yellow-700' : 'bg-white border-gray-200 text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            Docs incompletas: {listTab === 'active' ? activeIncompleteCount : archivedIncompleteCount}
+          </button>
+          <input
+            type="text"
             placeholder="Buscar por nombre, apellidos o DNI..."
-            className="w-full max-w-md bg-white border border-gray-200 rounded-xl px-4 py-2 outline-none focus:ring-4 focus:ring-blue-50 transition-all"
+            className="flex-1 min-w-[200px] bg-white border border-gray-200 rounded-xl px-4 py-2 outline-none focus:ring-4 focus:ring-blue-50 transition-all"
             value={searchTerm}
             onChange={e => setSearchTerm(e.target.value)}
           />
@@ -475,7 +470,7 @@ export const Guests: React.FC = () => {
                           Archivar
                         </button>
                       )}
-                      <button onClick={async () => { if(confirm('¿Seguro que quieres eliminar este huésped?')) { setLoading(true); await db.deleteGuest(g.id); setGuests(await db.getGuests()); setLoading(false); } }} className="text-red-300 hover:text-red-600 font-bold text-xs uppercase tracking-wider transition-colors">Borrar</button>
+                      <button onClick={async () => { if(confirm('¿Seguro que quieres eliminar este huésped?')) { setLoading(true); try { await db.deleteGuest(g.id); setGuests(await db.getGuests()); } catch (err: any) { alert(err?.message || 'Error al eliminar huésped'); } finally { setLoading(false); } } }} className="text-red-300 hover:text-red-600 font-bold text-xs uppercase tracking-wider transition-colors">Borrar</button>
                     </div>
                   </td>
                 </tr>
@@ -661,31 +656,36 @@ export const Guests: React.FC = () => {
                  <div className="space-y-4">
                    {guestReservations.length > 0 ? (
                      <div className="space-y-3">
-                       {guestReservations.sort((a, b) => new Date(b.startDate).getTime() - new Date(a.startDate).getTime()).map(res => (
-                         <div key={res.id} className="p-4 bg-gradient-to-r from-blue-50 to-transparent border-l-4 border-blue-500 rounded-lg">
+                       {guestReservations.sort((a, b) => new Date(b.startDate).getTime() - new Date(a.startDate).getTime()).map(res => {
+                        const prop = properties.find(p => String(p.id) === String(res.propertyId));
+                        const room = rooms.find(r => String(r.id) === String(res.roomId));
+                        const isPaid = res.paymentMethod === 'cash' || res.paymentMethod === 'transfer';
+                        return (
+                         <div key={res.id} className="p-4 bg-gradient-to-r from-blue-50 to-transparent border-l-4 border-blue-500 rounded-lg cursor-pointer hover:shadow-md hover:from-blue-100 transition-all" onClick={() => { setEditingReservation(res); setResModalOpen(true); }}>
                            <div className="flex justify-between items-start">
                              <div>
-                               <p className="font-bold text-gray-800">{res.propertyName}</p>
-                               <p className="text-[10px] text-gray-500 mt-1">Habitación: {res.roomNumber}</p>
+                               <p className="font-bold text-gray-800">{prop?.name || 'Propiedad desconocida'}</p>
+                               <p className="text-[10px] text-gray-500 mt-1">Habitación: {room?.name || 'N/A'}</p>
                                <p className="text-xs text-gray-600 mt-2">
                                  📅 {new Date(res.startDate).toLocaleDateString()} - {new Date(res.endDate).toLocaleDateString()}
                                </p>
                                <p className="text-xs font-bold text-gray-700 mt-1">
-                                 💰 {res.amount}€
-                                 {res.status === 'paid' && ' ✅ Pagado'}
-                                 {res.status === 'pending' && ' ⏳ Pendiente'}
+                                 💰 {res.price ?? 0}€
+                                 {isPaid && ' ✅ Pagado'}
+                                 {!isPaid && ' ⏳ Pendiente'}
                                </p>
                              </div>
                              <span className={`text-[10px] font-black px-2 py-1 rounded ${
-                               res.status === 'paid' 
+                               isPaid 
                                  ? 'bg-green-100 text-green-700' 
                                  : 'bg-yellow-100 text-yellow-700'
                              }`}>
-                               {res.status === 'paid' ? 'PAGADA' : 'PENDIENTE'}
+                               {isPaid ? 'PAGADA' : 'PENDIENTE'}
                              </span>
                            </div>
                          </div>
-                       ))}
+                        );
+                       })}
                      </div>
                    ) : (
                      <div className="text-center py-12">
@@ -792,6 +792,33 @@ export const Guests: React.FC = () => {
              </form>
           </div>
         </div>
+      )}
+
+      {resModalOpen && editingReservation && (
+        <ReservationModal
+          rooms={rooms.filter(r => String(r.propertyId) === String(editingReservation.propertyId))}
+          propertyId={String(editingReservation.propertyId)}
+          initialReservation={editingReservation}
+          initialData={null}
+          onClose={() => { setResModalOpen(false); setEditingReservation(null); }}
+          onSave={async (res) => {
+            await db.saveReservation(res);
+            const allRes = await db.getReservations();
+            setGuestReservations(allRes.filter(r => String(r.guestId) === String(editingGuest?.id)));
+            setResModalOpen(false);
+            setEditingReservation(null);
+          }}
+          onDelete={async (id) => {
+            await db.deleteReservation(id);
+            setGuestReservations(prev => prev.filter(r => String(r.id) !== String(id)));
+            setResModalOpen(false);
+            setEditingReservation(null);
+          }}
+          onReservationUpdated={(updatedRes) => {
+            setGuestReservations(prev => prev.map(r => String(r.id) === String(updatedRes.id) ? { ...r, ...updatedRes } : r));
+            setEditingReservation(updatedRes);
+          }}
+        />
       )}
     </div>
   );

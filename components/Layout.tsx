@@ -38,15 +38,17 @@ const SidebarSubLink: React.FC<{ to: string, label: string, onClick?: () => void
   );
 };
 
-export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+export const Layout: React.FC<{ children: React.ReactNode; onLogout?: () => void }> = ({ children, onLogout }) => {
   const navigate = useNavigate();
   const location = useLocation();
   const currentUser = db.getAuthUser() || 'Admin';
+  const currentRole = db.getAuthRole();
+  const isAdmin = db.isAdmin();
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isConfigOpen, setIsConfigOpen] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
-  const isConfigRoute = ['/properties', '/guests', '/managers', '/owners'].includes(location.pathname);
+  const isConfigRoute = ['/properties', '/guests', '/managers', '/owners', '/settings'].includes(location.pathname);
 
   useEffect(() => {
     if (isConfigRoute) setIsConfigOpen(true);
@@ -54,7 +56,8 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
 
   const handleLogout = () => {
     db.setAuthUser(null);
-    window.location.reload();
+    if (onLogout) onLogout();
+    else window.location.reload();
   };
 
   const handleMobileClose = () => setIsMobileMenuOpen(false);
@@ -103,9 +106,23 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
             onClick={handleMobileClose}
           />
           <SidebarLink
+            to="/facturas"
+            label="Facturas"
+            icon={<svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>}
+            collapsed={isSidebarCollapsed}
+            onClick={handleMobileClose}
+          />
+          <SidebarLink
             to="/incidencias"
             label="Incidencias"
             icon={<svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10.29 3.86l-6.2 10.74A2 2 0 005.83 18h12.34a2 2 0 001.74-3.4l-6.2-10.74a2 2 0 00-3.42 0z"></path><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v4m0 4h.01"></path></svg>}
+            collapsed={isSidebarCollapsed}
+            onClick={handleMobileClose}
+          />
+          <SidebarLink
+            to="/notas"
+            label="Notas"
+            icon={<svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg>}
             collapsed={isSidebarCollapsed}
             onClick={handleMobileClose}
           />
@@ -141,6 +158,7 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
                 <SidebarSubLink to="/guests" label="Huéspedes" onClick={handleMobileClose} />
                 <SidebarSubLink to="/managers" label="Gestores" onClick={handleMobileClose} />
                 <SidebarSubLink to="/owners" label="Propietarios" onClick={handleMobileClose} />
+                {isAdmin && <SidebarSubLink to="/settings" label="Ajustes" onClick={handleMobileClose} />}
               </div>
             )}
           </div>
@@ -155,7 +173,7 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
               {!isSidebarCollapsed && (
                 <div>
                   <p className="text-sm font-semibold capitalize">{currentUser}</p>
-                  <p className="text-xs text-gray-500">Gestor</p>
+                  <p className="text-xs text-gray-500 capitalize">{currentRole}</p>
                 </div>
               )}
             </div>

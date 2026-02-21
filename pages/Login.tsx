@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { db } from '../services/db';
 
@@ -6,17 +5,19 @@ export const Login: React.FC<{ onLogin: () => void }> = ({ onLogin }) => {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
 
-  const validUsers = ['chema', 'luis', 'maria'];
-
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    const user = username.toLowerCase();
-    if (validUsers.includes(user) && password === 'Brickstarter') {
-      db.setAuthUser(user);
+    setError('');
+    setLoading(true);
+    try {
+      await db.login(username, password);
       onLogin();
-    } else {
-      setError('Usuario o contraseña incorrectos.');
+    } catch (err: any) {
+      setError(err.message || 'Usuario o contraseña incorrectos.');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -27,28 +28,26 @@ export const Login: React.FC<{ onLogin: () => void }> = ({ onLogin }) => {
           <div className="w-16 h-16 bg-blue-600 rounded-2xl mx-auto flex items-center justify-center mb-4">
              <svg className="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path></svg>
           </div>
-          <h1 className="text-3xl font-black text-gray-900">RoomFlow</h1>
+          <h1 className="text-3xl font-black text-gray-900">Beds25</h1>
           <p className="text-gray-500 mt-2">Introduce tus credenciales para acceder</p>
         </div>
 
         <form onSubmit={handleLogin} className="space-y-4">
           <div>
             <label className="block text-xs font-bold text-gray-400 uppercase mb-1">Usuario</label>
-            <select 
+            <input
+              type="text"
               className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3 outline-none focus:ring-2 focus:ring-blue-500"
+              placeholder="Nombre de usuario"
               value={username}
               onChange={e => setUsername(e.target.value)}
               required
-            >
-              <option value="">Selecciona usuario</option>
-              <option value="chema">Chema</option>
-              <option value="luis">Luis</option>
-              <option value="maria">Maria</option>
-            </select>
+              autoFocus
+            />
           </div>
           <div>
             <label className="block text-xs font-bold text-gray-400 uppercase mb-1">Contraseña</label>
-            <input 
+            <input
               type="password"
               className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3 outline-none focus:ring-2 focus:ring-blue-500"
               placeholder="••••••••"
@@ -58,11 +57,12 @@ export const Login: React.FC<{ onLogin: () => void }> = ({ onLogin }) => {
             />
           </div>
           {error && <p className="text-red-500 text-xs font-bold text-center">{error}</p>}
-          <button 
+          <button
             type="submit"
-            className="w-full bg-blue-600 text-white py-4 rounded-xl font-bold shadow-lg shadow-blue-200 hover:bg-blue-700 transition-all transform hover:-translate-y-1"
+            disabled={loading}
+            className="w-full bg-blue-600 text-white py-4 rounded-xl font-bold shadow-lg shadow-blue-200 hover:bg-blue-700 transition-all transform hover:-translate-y-1 disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            Entrar
+            {loading ? 'Entrando...' : 'Entrar'}
           </button>
         </form>
       </div>

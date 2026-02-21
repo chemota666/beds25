@@ -1,4 +1,4 @@
-import { Property, Room, Reservation, Guest, Invoice, Owner, Manager, Incident } from '../types';
+import { Property, Room, Reservation, Guest, Invoice, Owner, Manager, Incident, Note } from '../types';
 import { mysqlApi } from './mysqlApi';
 import { logger } from '../utils/logger';
 import { STORAGE_KEYS } from '../utils/constants';
@@ -125,21 +125,6 @@ export const db = {
         }
       }
 
-      // If changing from unpaid to paid without invoice -> call server endpoint
-      if (isPaidNow && !hadInvoice && !res.invoiceNumber) {
-        try {
-          const result = await mysqlApi.fetchData(`invoices/generate?reservationId=${res.id}`);
-          if (result && (result as any).invoiceNumber) {
-            res.invoiceNumber = (result as any).invoiceNumber;
-            if ((result as any).invoiceDate) {
-              res.invoiceDate = (result as any).invoiceDate;
-            }
-          }
-        } catch (err) {
-          console.warn('Error calling /invoices/generate:', err && err.message ? err.message : err);
-        }
-      }
-
       // Update reservation
       normalizeInvoiceFields(res);
       await mysqlApi.updateData('reservations', String(res.id), res);
@@ -151,31 +136,16 @@ export const db = {
       const inserted = await mysqlApi.insertData('reservations', toInsert);
       const newId = inserted && inserted.id ? String(inserted.id) : null;
 
-      // If marked as paid at creation and no invoice -> call server endpoint
-      if (isPaidNow && !res.invoiceNumber && newId) {
-        try {
-          const result = await mysqlApi.fetchData(`invoices/generate?reservationId=${newId}`);
-          if (result && (result as any).invoiceNumber) {
-            await mysqlApi.updateData('reservations', String(newId), { invoiceNumber: (result as any).invoiceNumber, invoiceDate: (result as any).invoiceDate });
-          }
-        } catch (err) {
-          console.warn('Error calling /invoices/generate after insert:', err && err.message ? err.message : err);
-        }
-      }
+      // Invoices are now generated manually via batch, not auto-generated on payment
     }
   },
 
   deleteReservation: async (id: string) => {
     // Prevent deletion of invoiced reservations
-    try {
-      const all = await mysqlApi.fetchData('reservations');
-      const res = all.find((r: Reservation) => String(r.id) === String(id));
-      if (res && res.invoiceNumber) {
-        throw new Error('No se puede eliminar una reserva que ya tiene factura.');
-      }
-    } catch (err) {
-      if (err && err.message && err.message.includes('No se puede eliminar')) throw err;
-      // otherwise fallthrough to deletion
+    const all = await mysqlApi.fetchData('reservations');
+    const res = all.find((r: Reservation) => String(r.id) === String(id));
+    if (res && res.invoiceNumber) {
+      throw new Error('No se puede eliminar una reserva que ya tiene factura.');
     }
     await mysqlApi.deleteData('reservations', id);
   },
@@ -199,19 +169,17 @@ export const db = {
     if (guest.id && !String(guest.id).startsWith('temp_')) {
       await mysqlApi.updateData('guests', String(guest.id), guest);
     } else {
-      await mysqlApi.insertData('guests', guest);
+      const toInsert = { ...guest };
+      delete toInsert.id;
+      await mysqlApi.insertData('guests', toInsert);
     }
   },
 
   deleteGuest: async (id: string) => {
-    try {
-      const all = await mysqlApi.fetchData('reservations');
-      const hasRes = all.some((r: Reservation) => String(r.guestId) === String(id));
-      if (hasRes) {
-        throw new Error('No se puede eliminar un huésped con reservas. Primero elimina reservas y facturas.');
-      }
-    } catch (err) {
-      if (err && err.message && err.message.includes('No se puede eliminar')) throw err;
+    const all = await mysqlApi.fetchData('reservations');
+    const hasRes = all.some((r: Reservation) => String(r.guestId) === String(id));
+    if (hasRes) {
+      throw new Error('No se puede eliminar un huésped con reservas. Primero elimina reservas y facturas.');
     }
     await mysqlApi.deleteData('guests', id);
   },
@@ -237,19 +205,131 @@ export const db = {
   },
 
   getAuthUser: (): string | null => {
-    return localStorage.getItem(KEYS.AUTH_USER);
+    const raw = localStorage.getItem(KEYS.AUTH_USER);
+    if (!raw) return null;
+    try {
+      const parsed = JSON.parse(raw);
+      return parsed.username || raw;
+    } catch {
+      return raw;
+    }
   },
 
-  setAuthUser: (username: string | null) => {
-    if (username) localStorage.setItem(KEYS.AUTH_USER, username);
-    else localStorage.removeItem(KEYS.AUTH_USER);
+  getAuthUserObj: (): { id: string; username: string; role: string } | null => {
+    const raw = localStorage.getItem(KEYS.AUTH_USER);
+    if (!raw) return null;
+    try {
+      return JSON.parse(raw);
+    } catch {
+      return null;
+    }
   },
 
-  getInvoices: async (): Promise<Invoice[]> => [],
+  getAuthRole: (): string => {
+    const raw = localStorage.getItem(KEYS.AUTH_USER);
+    if (!raw) return 'gestor';
+    try {
+      const parsed = JSON.parse(raw);
+      return parsed.role || 'gestor';
+    } catch {
+      return 'gestor';
+    }
+  },
+
+  isAdmin: (): boolean => {
+    const raw = localStorage.getItem(KEYS.AUTH_USER);
+    if (!raw) return false;
+    try {
+      const parsed = JSON.parse(raw);
+      return parsed.role === 'admin';
+    } catch {
+      return false;
+    }
+  },
+
+  setAuthUser: (user: { id: string; username: string; role: string } | string | null) => {
+    if (!user) {
+      localStorage.removeItem(KEYS.AUTH_USER);
+    } else if (typeof user === 'string') {
+      localStorage.setItem(KEYS.AUTH_USER, user);
+    } else {
+      localStorage.setItem(KEYS.AUTH_USER, JSON.stringify(user));
+    }
+  },
+
+  login: async (username: string, password: string): Promise<{ id: string; username: string; role: string }> => {
+    const result = await mysqlApi.login(username, password);
+    localStorage.setItem(KEYS.AUTH_USER, JSON.stringify(result));
+    return result;
+  },
+
+  getInvoices: async (): Promise<any[]> => {
+    try {
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      try {
+        const raw = localStorage.getItem(KEYS.AUTH_USER);
+        if (raw) { const p = JSON.parse(raw); if (p.username) headers['X-User'] = p.username; }
+      } catch (_) {}
+      const response = await fetch('/api/invoices/list', { headers });
+      if (!response.ok) throw new Error(`Error ${response.status}`);
+      return await response.json();
+    } catch (error) {
+      console.error('Error fetching invoices:', error);
+      return [];
+    }
+  },
+
+  getPendingInvoiceCount: async (filters?: { fromDate?: string; toDate?: string; ownerId?: string }): Promise<number> => {
+    try {
+      const headers: Record<string, string> = {};
+      try {
+        const raw = localStorage.getItem(KEYS.AUTH_USER);
+        if (raw) { const p = JSON.parse(raw); if (p.username) headers['X-User'] = p.username; }
+      } catch (_) {}
+      const params = new URLSearchParams();
+      if (filters?.fromDate) params.set('fromDate', filters.fromDate);
+      if (filters?.toDate) params.set('toDate', filters.toDate);
+      if (filters?.ownerId) params.set('ownerId', filters.ownerId);
+      const qs = params.toString();
+      const response = await fetch(`/api/invoices/pending-count${qs ? '?' + qs : ''}`, { headers });
+      if (!response.ok) return 0;
+      const data = await response.json();
+      return data.count || 0;
+    } catch { return 0; }
+  },
+
+  generateBatchInvoices: async (filters?: { fromDate?: string; toDate?: string; ownerId?: string }): Promise<{ generated: number; errors: any[] }> => {
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    try {
+      const raw = localStorage.getItem(KEYS.AUTH_USER);
+      if (raw) { const p = JSON.parse(raw); if (p.username) headers['X-User'] = p.username; }
+    } catch (_) {}
+    const body: Record<string, string> = {};
+    if (filters?.fromDate) body.fromDate = filters.fromDate;
+    if (filters?.toDate) body.toDate = filters.toDate;
+    if (filters?.ownerId) body.ownerId = filters.ownerId;
+    const response = await fetch('/api/invoices/generate-batch', {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(body)
+    });
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}));
+      throw new Error(err.error || 'Error en generacion masiva');
+    }
+    return await response.json();
+  },
+
   saveInvoice: async (inv: Invoice) => {},
   deleteInvoice: async (reservationId: string) => {
+    const headers: Record<string, string> = {};
+    try {
+      const raw = localStorage.getItem(KEYS.AUTH_USER);
+      if (raw) { const p = JSON.parse(raw); if (p.username) headers['X-User'] = p.username; }
+    } catch (_) {}
     const response = await fetch(`/api/invoices/${reservationId}`, {
-      method: 'DELETE'
+      method: 'DELETE',
+      headers
     });
     if (!response.ok) {
       const err = await response.json().catch(() => ({}));
@@ -367,5 +447,28 @@ export const db = {
 
   deleteManager: async (id: string) => {
     await mysqlApi.deleteData('managers', id);
+  },
+
+  // NOTES CRUD
+  getNotes: async (): Promise<Note[]> => {
+    try {
+      return await mysqlApi.fetchData('notes');
+    } catch (error) {
+      return [];
+    }
+  },
+
+  saveNote: async (note: Note) => {
+    if (note.id && !String(note.id).startsWith('temp_')) {
+      await mysqlApi.updateData('notes', String(note.id), note);
+    } else {
+      const toInsert = { ...note };
+      delete toInsert.id;
+      await mysqlApi.insertData('notes', toInsert);
+    }
+  },
+
+  deleteNote: async (id: string) => {
+    await mysqlApi.deleteData('notes', id);
   }
 };

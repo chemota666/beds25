@@ -26,3 +26,17 @@ deploy_roomflow.pub
 *.njsproj
 *.sln
 *.sw?
+
+# Credentials and sensitive data
+datos*.txt
+
+# Uploads (user data)
+uploads/
+
+# Binaries and temp files
+tailwindcss.exe
+tmp-*.pdf
+*.exe
+
+# Claude local settings
+.claude/

@@ -48,12 +48,16 @@ export const Properties: React.FC = () => {
   // Load properties and owners
   useEffect(() => {
     const loadData = async () => {
-      const props = await db.getProperties();
-      const ownersList = await db.getOwners();
-      const managersList = await db.getManagers();
-      setProperties(props.map(p => ({ ...p, archived: Boolean(p.archived) })));
-      setOwners(ownersList);
-      setManagers(managersList);
+      try {
+        const props = await db.getProperties();
+        const ownersList = await db.getOwners();
+        const managersList = await db.getManagers();
+        setProperties(props.map(p => ({ ...p, archived: Boolean(p.archived) })));
+        setOwners(ownersList);
+        setManagers(managersList);
+      } catch (err) {
+        console.error('Error loading properties data:', err);
+      }
     };
     loadData();
   }, []);
@@ -91,9 +95,13 @@ export const Properties: React.FC = () => {
 
   const handleDeleteProperty = async (id: string) => {
     if (confirm('¿Estás seguro de que quieres eliminar este inmueble y todas sus habitaciones?')) {
-      await db.deleteProperty(id);
-      const props = await db.getProperties();
-      setProperties(props.map(p => ({ ...p, archived: Boolean(p.archived) })));
+      try {
+        await db.deleteProperty(id);
+        const props = await db.getProperties();
+        setProperties(props.map(p => ({ ...p, archived: Boolean(p.archived) })));
+      } catch (err: any) {
+        alert(err?.message || 'Error al eliminar inmueble');
+      }
     }
   };
 
@@ -418,12 +426,22 @@ export const Properties: React.FC = () => {
                   </select>
                 </div>
 
-                <div>
-                  <label className="block text-xs font-semibold text-gray-500 uppercase mb-1">Número de Habitaciones</label>
-                  <input 
-                    required type="number" className="w-full bg-gray-50 border border-gray-200 rounded-lg p-2 outline-none focus:ring-2 focus:ring-blue-500" 
-                    value={editingProperty.numRooms} onChange={e => setEditingProperty({...editingProperty, numRooms: Number(e.target.value)})}
-                  />
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-500 uppercase mb-1">Número de Habitaciones</label>
+                    <input
+                      required type="number" className="w-full bg-gray-50 border border-gray-200 rounded-lg p-2 outline-none focus:ring-2 focus:ring-blue-500"
+                      value={editingProperty.numRooms} onChange={e => setEditingProperty({...editingProperty, numRooms: Number(e.target.value)})}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-500 uppercase mb-1">Superficie (m²)</label>
+                    <input
+                      type="number" className="w-full bg-gray-50 border border-gray-200 rounded-lg p-2 outline-none focus:ring-2 focus:ring-blue-500"
+                      placeholder="ej: 76"
+                      value={editingProperty.sqm || ''} onChange={e => setEditingProperty({...editingProperty, sqm: Number(e.target.value) || undefined})}
+                    />
+                  </div>
                 </div>
 
                 <div className="space-y-3 pt-2">

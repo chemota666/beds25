@@ -7,6 +7,14 @@ export interface AuditFields {
   updatedBy?: string;
 }
 
+export interface Note {
+  id: string;
+  content: string;
+  author?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
 export interface Guest extends AuditFields {
   id: string;
   name: string;
@@ -36,6 +44,7 @@ export interface Property extends AuditFields {
   owner: string;
   managerId?: string;
   numRooms: number;
+  sqm?: number;
   archived?: boolean;
   createdAt?: string;
   updatedAt?: string;
@@ -96,11 +105,19 @@ export interface User {
   updatedAt: string;
 }
 
+export interface AuthUser {
+  id: string;
+  username: string;
+  role: 'admin' | 'gestor';
+}
+
 export interface Owner {
   id: string;
   name: string;
   dni?: string;
   phone?: string;
+  email?: string;
+  iban?: string;
   taxId?: string;
   taxAddress?: string;
   commission?: number;

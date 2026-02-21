@@ -55,8 +55,13 @@ export const Managers: React.FC = () => {
   const handleDelete = async (id: string) => {
     if (!confirm('¿Seguro que quieres eliminar este gestor?')) return;
     setLoading(true);
-    await db.deleteManager(id);
-    await loadManagers();
+    try {
+      await db.deleteManager(id);
+      await loadManagers();
+    } catch (err: any) {
+      alert(err?.message || 'Error al eliminar gestor');
+      setLoading(false);
+    }
   };
 
   const isNewManager = editingManager && String(editingManager.id).startsWith('temp_');
