@@ -770,10 +770,13 @@ app.put('/:table/:id', async (req, res) => {
 
     // Protect invoiced reservations from changes to core fields
     if (req.params.table === 'reservations' && oldValues && oldValues.invoiceNumber) {
+      const normalizedOld = normalizeRowDates(oldValues);
       const protectedFields = ['price', 'startDate', 'endDate', 'propertyId', 'roomId', 'guestId', 'paymentMethod'];
       const violations = protectedFields.filter(f => {
         if (data[f] === undefined) return false;
-        return String(data[f]) !== String(oldValues[f]);
+        const newVal = f === 'price' ? Number(data[f]) : String(data[f]);
+        const oldVal = f === 'price' ? Number(normalizedOld[f]) : String(normalizedOld[f]);
+        return newVal !== oldVal;
       });
       if (violations.length > 0) {
         return res.status(400).json({

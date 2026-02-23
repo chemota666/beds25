@@ -44,6 +44,7 @@ export const Properties: React.FC = () => {
   const [propertyFiles, setPropertyFiles] = useState<Record<PropertyDocType, PropertyFileInfo[]>>(createEmptyDocMap);
   const [docUploading, setDocUploading] = useState<Record<PropertyDocType, boolean>>(() => createEmptyFlagMap(false));
   const [docError, setDocError] = useState<Record<PropertyDocType, string | null>>(createEmptyErrorMap);
+  const [docDragOver, setDocDragOver] = useState<Record<PropertyDocType, boolean>>(() => createEmptyFlagMap(false));
 
   // Load properties and owners
   useEffect(() => {
@@ -457,17 +458,32 @@ export const Properties: React.FC = () => {
                         <div className="flex items-center justify-between mb-2">
                           <span className="text-xs font-bold text-gray-700 uppercase">{doc.label}</span>
                         </div>
-                        <input
-                          type="file"
-                          disabled={isNewProperty || docUploading[doc.type]}
-                          accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
-                          onChange={(e) => {
-                            const file = e.target.files?.[0];
+                        <label
+                          className={`flex flex-col items-center justify-center border-2 border-dashed rounded-xl p-3 cursor-pointer transition-all ${docDragOver[doc.type] ? 'border-blue-500 bg-blue-50' : 'border-gray-300 hover:border-blue-400 hover:bg-white'} ${isNewProperty ? 'opacity-50 cursor-not-allowed' : ''}`}
+                          onDragOver={(e) => { if (!isNewProperty) { e.preventDefault(); setDocDragOver(prev => ({ ...prev, [doc.type]: true })); } }}
+                          onDragLeave={() => setDocDragOver(prev => ({ ...prev, [doc.type]: false }))}
+                          onDrop={(e) => {
+                            e.preventDefault();
+                            setDocDragOver(prev => ({ ...prev, [doc.type]: false }));
+                            if (isNewProperty) return;
+                            const file = e.dataTransfer.files?.[0];
                             if (file) handlePropertyDocUpload(doc.type, file);
-                            e.currentTarget.value = '';
                           }}
-                          className="w-full text-xs text-gray-600 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
-                        />
+                        >
+                          <svg className={`w-5 h-5 mb-1 ${docDragOver[doc.type] ? 'text-blue-500' : 'text-gray-300'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path></svg>
+                          <span className="text-[10px] font-bold text-gray-400">{docUploading[doc.type] ? 'Subiendo...' : 'Arrastra o click'}</span>
+                          <input
+                            type="file"
+                            disabled={isNewProperty || docUploading[doc.type]}
+                            accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
+                            className="hidden"
+                            onChange={(e) => {
+                              const file = e.target.files?.[0];
+                              if (file) handlePropertyDocUpload(doc.type, file);
+                              e.currentTarget.value = '';
+                            }}
+                          />
+                        </label>
                         {docUploading[doc.type] && (
                           <p className="text-[11px] text-blue-600 mt-1">Subiendo...</p>
                         )}

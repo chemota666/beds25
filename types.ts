@@ -129,7 +129,7 @@ export interface Owner {
 
 export interface IncidentLine {
   description: string;
-  amount: number;
+  amount: number | string;
 }
 
 export interface Incident extends AuditFields {
@@ -138,6 +138,7 @@ export interface Incident extends AuditFields {
   title: string;
   solved: boolean;
   refactured: boolean;
+  archived: boolean;
   lines: IncidentLine[];
   total: number;
   createdAt?: string;

@@ -16,6 +16,7 @@ export const Reservations: React.FC = () => {
   // Filtros
   const [selectedOwnerId, setSelectedOwnerId] = useState<string>('all');
   const [selectedPropertyId, setSelectedPropertyId] = useState<string>('all');
+  const [selectedManagerId, setSelectedManagerId] = useState<string>('all');
   const [startDate, setStartDate] = useState<string>('');
   const [endDate, setEndDate] = useState<string>('');
   const [sortBy, setSortBy] = useState<'date' | 'amount' | 'guest'>('date');
@@ -113,6 +114,16 @@ export const Reservations: React.FC = () => {
       const resStart = new Date(res.startDate);
       const filterEnd = new Date(endDate);
       if (resStart > filterEnd) return false;
+    }
+
+    // Filtro por gestor
+    if (selectedManagerId !== 'all') {
+      const prop = properties.find(p => String(p.id) === String(res.propertyId));
+      if (selectedManagerId === 'unassigned') {
+        if (prop?.managerId) return false;
+      } else {
+        if (!prop || String(prop.managerId) !== selectedManagerId) return false;
+      }
     }
 
     // Filtro por estado de cobro
@@ -282,19 +293,19 @@ export const Reservations: React.FC = () => {
           <p className="text-sm text-gray-500 mt-1">Pendientes y abonadas</p>
         </div>
         <div className="flex flex-wrap items-center gap-3">
-          <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4">
+          <div onClick={() => { setPaymentFilter('pending'); setSelectedManagerId('all'); }} className="bg-yellow-50 border border-yellow-200 rounded-xl p-4 cursor-pointer hover:shadow-md transition-all">
             <div className="text-xs font-bold text-yellow-600 uppercase">Pendiente Cobro</div>
             <div className="text-2xl font-black text-yellow-700">€{totalPending.toFixed(2)}</div>
           </div>
-          <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
+          <div onClick={() => { setPaymentFilter('transfer'); setSelectedManagerId('all'); }} className="bg-blue-50 border border-blue-200 rounded-xl p-4 cursor-pointer hover:shadow-md transition-all">
             <div className="text-xs font-bold text-blue-600 uppercase">Abonado Banco</div>
             <div className="text-2xl font-black text-blue-700">€{totalPaidBank.toFixed(2)}</div>
           </div>
-          <div className="bg-green-50 border border-green-200 rounded-xl p-4">
+          <div onClick={() => { setPaymentFilter('cash'); setSelectedManagerId('all'); }} className="bg-green-50 border border-green-200 rounded-xl p-4 cursor-pointer hover:shadow-md transition-all">
             <div className="text-xs font-bold text-green-600 uppercase">Abonado Efectivo</div>
             <div className="text-2xl font-black text-green-700">€{totalPaidCash.toFixed(2)}</div>
           </div>
-          <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
+          <div onClick={() => { setPaymentFilter('cash_pending_delivery'); setSelectedManagerId('all'); }} className="bg-amber-50 border border-amber-200 rounded-xl p-4 cursor-pointer hover:shadow-md transition-all">
             <div className="text-xs font-bold text-amber-600 uppercase">Efectivo Pendiente Entrega</div>
             <div className="text-2xl font-black text-amber-700">€{totalCashPendingDelivery.toFixed(2)}</div>
           </div>
@@ -318,20 +329,20 @@ export const Reservations: React.FC = () => {
               <tbody className="divide-y divide-gray-100">
                 {managerSummaries.map(summary => (
                   <tr key={summary.id}>
-                    <td className="px-4 py-3 font-semibold text-gray-700">{summary.name}</td>
-                    <td className="px-4 py-3 text-right text-gray-700">€{summary.cashPaid.toFixed(2)}</td>
-                    <td className="px-4 py-3 text-right text-gray-700">€{summary.cashDelivered.toFixed(2)}</td>
-                    <td className="px-4 py-3 text-right text-amber-700 font-semibold">€{summary.cashPending.toFixed(2)}</td>
-                    <td className="px-4 py-3 text-right text-yellow-700 font-semibold">€{summary.unpaid.toFixed(2)}</td>
+                    <td className="px-4 py-3 font-semibold text-gray-700 cursor-pointer hover:text-blue-600" onClick={() => { setSelectedManagerId(summary.id); setPaymentFilter('all'); }}>{summary.name}</td>
+                    <td className="px-4 py-3 text-right text-gray-700 cursor-pointer hover:text-blue-600" onClick={() => { setSelectedManagerId(summary.id); setPaymentFilter('cash'); }}>€{summary.cashPaid.toFixed(2)}</td>
+                    <td className="px-4 py-3 text-right text-gray-700 cursor-pointer hover:text-blue-600" onClick={() => { setSelectedManagerId(summary.id); setPaymentFilter('cash'); }}>€{summary.cashDelivered.toFixed(2)}</td>
+                    <td className="px-4 py-3 text-right text-amber-700 font-semibold cursor-pointer hover:text-blue-600" onClick={() => { setSelectedManagerId(summary.id); setPaymentFilter('cash_pending_delivery'); }}>€{summary.cashPending.toFixed(2)}</td>
+                    <td className="px-4 py-3 text-right text-yellow-700 font-semibold cursor-pointer hover:text-blue-600" onClick={() => { setSelectedManagerId(summary.id); setPaymentFilter('pending'); }}>€{summary.unpaid.toFixed(2)}</td>
                   </tr>
                 ))}
                 {unassignedSummary && (
                   <tr>
-                    <td className="px-4 py-3 font-semibold text-gray-500">{unassignedSummary.name}</td>
-                    <td className="px-4 py-3 text-right text-gray-500">€{unassignedSummary.cashPaid.toFixed(2)}</td>
-                    <td className="px-4 py-3 text-right text-gray-500">€{unassignedSummary.cashDelivered.toFixed(2)}</td>
-                    <td className="px-4 py-3 text-right text-gray-500">€{unassignedSummary.cashPending.toFixed(2)}</td>
-                    <td className="px-4 py-3 text-right text-gray-500">€{unassignedSummary.unpaid.toFixed(2)}</td>
+                    <td className="px-4 py-3 font-semibold text-gray-500 cursor-pointer hover:text-blue-600" onClick={() => { setSelectedManagerId('unassigned'); setPaymentFilter('all'); }}>{unassignedSummary.name}</td>
+                    <td className="px-4 py-3 text-right text-gray-500 cursor-pointer hover:text-blue-600" onClick={() => { setSelectedManagerId('unassigned'); setPaymentFilter('cash'); }}>€{unassignedSummary.cashPaid.toFixed(2)}</td>
+                    <td className="px-4 py-3 text-right text-gray-500 cursor-pointer hover:text-blue-600" onClick={() => { setSelectedManagerId('unassigned'); setPaymentFilter('cash'); }}>€{unassignedSummary.cashDelivered.toFixed(2)}</td>
+                    <td className="px-4 py-3 text-right text-gray-500 cursor-pointer hover:text-blue-600" onClick={() => { setSelectedManagerId('unassigned'); setPaymentFilter('cash_pending_delivery'); }}>€{unassignedSummary.cashPending.toFixed(2)}</td>
+                    <td className="px-4 py-3 text-right text-gray-500 cursor-pointer hover:text-blue-600" onClick={() => { setSelectedManagerId('unassigned'); setPaymentFilter('pending'); }}>€{unassignedSummary.unpaid.toFixed(2)}</td>
                   </tr>
                 )}
               </tbody>
@@ -342,7 +353,7 @@ export const Reservations: React.FC = () => {
 
       {/* Filtros */}
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 space-y-4">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-7 gap-4">
           {/* Propietario */}
           <div>
             <label className="block text-xs font-bold text-gray-400 uppercase mb-2">Propietario</label>
@@ -357,6 +368,21 @@ export const Reservations: React.FC = () => {
               <option value="all">Todos</option>
               {owners.map(o => (
                 <option key={o.id} value={o.id}>{o.name}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* Gestor */}
+          <div>
+            <label className="block text-xs font-bold text-gray-400 uppercase mb-2">Gestor</label>
+            <select
+              value={selectedManagerId}
+              onChange={(e) => setSelectedManagerId(e.target.value)}
+              className="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="all">Todos</option>
+              {managers.map(m => (
+                <option key={m.id} value={String(m.id)}>{m.name}</option>
               ))}
             </select>
           </div>
@@ -446,6 +472,7 @@ export const Reservations: React.FC = () => {
             onClick={() => {
               setSelectedOwnerId('all');
               setSelectedPropertyId('all');
+              setSelectedManagerId('all');
               setStartDate('');
               setEndDate('');
               setSortBy('date');
@@ -581,6 +608,13 @@ export const Reservations: React.FC = () => {
                   );
                 })}
               </tbody>
+              <tfoot className="bg-gray-50 border-t-2 border-gray-200">
+                <tr>
+                  <td colSpan={6} className="px-6 py-3 text-right text-xs font-black text-gray-600 uppercase">Total</td>
+                  <td className="px-6 py-3 text-right text-sm font-black text-gray-900">€{filteredReservations.reduce((sum, r) => sum + (Number(r.price) || 0), 0).toFixed(2)}</td>
+                  <td colSpan={6}></td>
+                </tr>
+              </tfoot>
             </table>
           </div>
         </div>

@@ -7,6 +7,7 @@ export const Incidents: React.FC = () => {
   const [properties, setProperties] = useState<Property[]>([]);
   const [loading, setLoading] = useState(true);
 
+  const [listTab, setListTab] = useState<'active' | 'archived'>('active');
   const [filterPropertyId, setFilterPropertyId] = useState('all');
   const [filterSolved, setFilterSolved] = useState<'all' | 'yes' | 'no'>('all');
   const [filterRefactured, setFilterRefactured] = useState<'all' | 'yes' | 'no'>('all');
@@ -19,6 +20,7 @@ export const Incidents: React.FC = () => {
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [incidentFiles, setIncidentFiles] = useState<Array<{ filename: string; url: string }>>([]);
+  const [incidentDragOver, setIncidentDragOver] = useState(false);
 
   const loadData = async () => {
     try {
@@ -45,8 +47,13 @@ export const Incidents: React.FC = () => {
     }
   }, [properties, editingIncident?.propertyId]);
 
+  const activeCount = useMemo(() => incidents.filter(i => !i.archived).length, [incidents]);
+  const archivedCount = useMemo(() => incidents.filter(i => i.archived).length, [incidents]);
+
   const filteredIncidents = useMemo(() => {
     return incidents.filter(incident => {
+      if (listTab === 'active' && incident.archived) return false;
+      if (listTab === 'archived' && !incident.archived) return false;
       if (filterPropertyId !== 'all' && String(incident.propertyId) !== String(filterPropertyId)) return false;
       if (filterSolved !== 'all' && incident.solved !== (filterSolved === 'yes')) return false;
       if (filterRefactured !== 'all' && incident.refactured !== (filterRefactured === 'yes')) return false;
@@ -62,7 +69,7 @@ export const Incidents: React.FC = () => {
       }
       return true;
     });
-  }, [incidents, filterPropertyId, filterSolved, filterRefactured, filterStartDate, filterEndDate]);
+  }, [incidents, listTab, filterPropertyId, filterSolved, filterRefactured, filterStartDate, filterEndDate]);
 
   const totalPendingRefacture = useMemo(() => {
     return filteredIncidents
@@ -84,6 +91,7 @@ export const Incidents: React.FC = () => {
       title: '',
       solved: false,
       refactured: false,
+      archived: false,
       lines: [{ description: '', amount: 0 }],
       total: 0,
       createdAt: new Date().toISOString(),
@@ -111,6 +119,15 @@ export const Incidents: React.FC = () => {
       await loadData();
     } catch (err: any) {
       alert(err?.message || 'Error al eliminar incidencia');
+    }
+  };
+
+  const handleToggleArchive = async (incident: Incident, archived: boolean) => {
+    try {
+      await db.saveIncident({ ...incident, archived });
+      setIncidents(prev => prev.map(i => String(i.id) === String(incident.id) ? { ...i, archived } : i));
+    } catch (err: any) {
+      alert(err?.message || 'Error al actualizar incidencia');
     }
   };
 
@@ -321,6 +338,30 @@ export const Incidents: React.FC = () => {
       </div>
 
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+        <div className="flex border-b border-gray-100">
+          <button
+            type="button"
+            onClick={() => setListTab('active')}
+            className={`flex-1 px-6 py-4 text-xs font-black uppercase tracking-widest transition-all border-b-2 ${
+              listTab === 'active'
+                ? 'border-blue-600 text-blue-600'
+                : 'border-transparent text-gray-400 hover:text-gray-600'
+            }`}
+          >
+            Activas ({activeCount})
+          </button>
+          <button
+            type="button"
+            onClick={() => setListTab('archived')}
+            className={`flex-1 px-6 py-4 text-xs font-black uppercase tracking-widest transition-all border-b-2 ${
+              listTab === 'archived'
+                ? 'border-blue-600 text-blue-600'
+                : 'border-transparent text-gray-400 hover:text-gray-600'
+            }`}
+          >
+            Archivadas ({archivedCount})
+          </button>
+        </div>
         <div className="overflow-x-auto">
           <table className="min-w-full">
             <thead className="bg-gray-50">
@@ -353,13 +394,28 @@ export const Incidents: React.FC = () => {
                       {incident.refactured ? 'Sí' : 'No'}
                     </span>
                   </td>
-                  <td className="px-6 py-4 text-right text-sm">
+                  <td className="px-6 py-4 text-right text-sm space-x-2">
                     <button
                       onClick={() => handleEdit(incident)}
-                      className="px-3 py-1 bg-blue-100 text-blue-600 rounded-lg text-xs font-bold hover:bg-blue-200 transition-colors mr-2"
+                      className="px-3 py-1 bg-blue-100 text-blue-600 rounded-lg text-xs font-bold hover:bg-blue-200 transition-colors"
                     >
                       Editar
                     </button>
+                    {incident.archived ? (
+                      <button
+                        onClick={() => handleToggleArchive(incident, false)}
+                        className="px-3 py-1 bg-emerald-100 text-emerald-600 rounded-lg text-xs font-bold hover:bg-emerald-200 transition-colors"
+                      >
+                        Activar
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => handleToggleArchive(incident, true)}
+                        className="px-3 py-1 bg-gray-100 text-gray-500 rounded-lg text-xs font-bold hover:bg-gray-200 transition-colors"
+                      >
+                        Archivar
+                      </button>
+                    )}
                     <button
                       onClick={() => handleDelete(incident.id)}
                       className="px-3 py-1 bg-red-100 text-red-600 rounded-lg text-xs font-bold hover:bg-red-200 transition-colors"
@@ -371,7 +427,9 @@ export const Incidents: React.FC = () => {
               ))}
               {!loading && filteredIncidents.length === 0 && (
                 <tr>
-                  <td colSpan={7} className="px-6 py-6 text-center text-sm text-gray-500">No hay incidencias</td>
+                  <td colSpan={7} className="px-6 py-6 text-center text-sm text-gray-500">
+                    {listTab === 'active' ? 'No hay incidencias activas' : 'No hay incidencias archivadas'}
+                  </td>
                 </tr>
               )}
             </tbody>
@@ -456,11 +514,19 @@ export const Incidents: React.FC = () => {
                         onChange={e => updateLine(index, { description: e.target.value })}
                       />
                       <input
-                        type="number"
+                        type="text"
+                        inputMode="decimal"
                         className="col-span-3 bg-gray-50 border border-gray-200 rounded-xl p-3 text-sm font-semibold text-gray-800"
                         placeholder="Importe"
                         value={line.amount}
-                        onChange={e => updateLine(index, { amount: Number(e.target.value) })}
+                        onChange={e => {
+                          const raw = e.target.value.replace(/[^0-9.,]/g, '');
+                          updateLine(index, { amount: raw });
+                        }}
+                        onBlur={e => {
+                          const num = Number(String(e.target.value).replace(',', '.')) || 0;
+                          updateLine(index, { amount: num });
+                        }}
                       />
                       <button
                         type="button"
@@ -479,17 +545,30 @@ export const Incidents: React.FC = () => {
 
               <div className="space-y-3">
                 <h3 className="text-xs font-black text-gray-400 uppercase tracking-[0.2em]">Documentos</h3>
-                <input
-                  type="file"
-                  disabled={uploading}
-                  onChange={(e) => {
-                    const file = e.target.files?.[0];
+                <label
+                  className={`flex flex-col items-center justify-center border-2 border-dashed rounded-xl p-4 cursor-pointer transition-all ${incidentDragOver ? 'border-blue-500 bg-blue-50' : 'border-gray-300 hover:border-blue-400 hover:bg-white'}`}
+                  onDragOver={(e) => { e.preventDefault(); setIncidentDragOver(true); }}
+                  onDragLeave={() => setIncidentDragOver(false)}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    setIncidentDragOver(false);
+                    const file = e.dataTransfer.files?.[0];
                     if (file) handleIncidentUpload(file);
-                    e.currentTarget.value = '';
                   }}
-                  className="w-full bg-white border border-gray-200 rounded-xl p-3 font-semibold text-gray-800"
-                />
-                {uploading && <p className="text-xs font-bold text-blue-600">Subiendo documento...</p>}
+                >
+                  <svg className={`w-6 h-6 mb-1 ${incidentDragOver ? 'text-blue-500' : 'text-gray-300'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path></svg>
+                  <span className="text-xs font-bold text-gray-400">{uploading ? 'Subiendo...' : 'Arrastra un archivo o haz click'}</span>
+                  <input
+                    type="file"
+                    disabled={uploading}
+                    className="hidden"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) handleIncidentUpload(file);
+                      e.currentTarget.value = '';
+                    }}
+                  />
+                </label>
                 {uploadError && <p className="text-xs font-bold text-red-600">{uploadError}</p>}
                 {String(editingIncident.id).startsWith('temp_') && (
                   <p className="text-xs text-gray-500">Guarda la incidencia antes de subir documentos.</p>

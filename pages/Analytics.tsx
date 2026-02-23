@@ -287,8 +287,9 @@ export const Analytics: React.FC = () => {
     });
 
     const getOverlapDays = (resStart: Date, resEnd: Date, rangeStart: Date, rangeEndExclusive: Date) => {
+      const resEndExclusive = addDays(resEnd, 1); // endDate is inclusive (last night), so add 1 for exclusive comparison
       const start = resStart > rangeStart ? resStart : rangeStart;
-      const end = resEnd < rangeEndExclusive ? resEnd : rangeEndExclusive;
+      const end = resEndExclusive < rangeEndExclusive ? resEndExclusive : rangeEndExclusive;
       return diffDays(start, end);
     };
 

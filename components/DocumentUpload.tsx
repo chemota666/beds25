@@ -16,6 +16,7 @@ export default function DocumentUpload({ ownerId }: DocumentUploadProps) {
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [dragOver, setDragOver] = useState(false);
 
   const loadFiles = async () => {
     try {
@@ -95,15 +96,34 @@ export default function DocumentUpload({ ownerId }: DocumentUploadProps) {
       
       <div className="mb-4">
         <label className="block text-sm font-medium text-gray-700 mb-2">Subir Contrato u Otro Documento</label>
-        <input
-          ref={fileInputRef}
-          type="file"
-          onChange={handleUpload}
-          disabled={uploading}
-          accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
-          className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
-        />
-        {uploading && <p className="text-sm text-blue-600 mt-1">Subiendo...</p>}
+        <label
+          className={`flex flex-col items-center justify-center border-2 border-dashed rounded-xl p-4 cursor-pointer transition-all ${dragOver ? 'border-blue-500 bg-blue-50' : 'border-gray-300 hover:border-blue-400 hover:bg-gray-50'}`}
+          onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+          onDragLeave={() => setDragOver(false)}
+          onDrop={(e) => {
+            e.preventDefault();
+            setDragOver(false);
+            const file = e.dataTransfer.files?.[0];
+            if (file && fileInputRef.current) {
+              const dt = new DataTransfer();
+              dt.items.add(file);
+              fileInputRef.current.files = dt.files;
+              fileInputRef.current.dispatchEvent(new Event('change', { bubbles: true }));
+            }
+          }}
+        >
+          <svg className={`w-6 h-6 mb-1 ${dragOver ? 'text-blue-500' : 'text-gray-300'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path></svg>
+          <span className="text-xs font-bold text-gray-400">{uploading ? 'Subiendo...' : 'Arrastra un archivo o haz click'}</span>
+          <span className="text-[10px] text-gray-400 mt-1">PDF, DOC, JPG, PNG</span>
+          <input
+            ref={fileInputRef}
+            type="file"
+            onChange={handleUpload}
+            disabled={uploading}
+            accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
+            className="hidden"
+          />
+        </label>
         {error && <p className="text-sm text-red-600 mt-1">{error}</p>}
       </div>
 

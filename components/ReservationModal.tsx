@@ -27,6 +27,7 @@ export const ReservationModal: React.FC<ReservationModalProps> = ({ rooms: initi
   const [newGuest, setNewGuest] = useState({ name: '', surname: '', dni: '' });
   const [receiptUploading, setReceiptUploading] = useState(false);
   const [receiptError, setReceiptError] = useState<string | null>(null);
+  const [receiptDragOver, setReceiptDragOver] = useState(false);
   const [canDeleteInvoice, setCanDeleteInvoice] = useState(false);
   const roomSyncAttempted = useRef<Set<string>>(new Set());
 
@@ -632,8 +633,8 @@ export const ReservationModal: React.FC<ReservationModalProps> = ({ rooms: initi
 
           <div className="bg-gray-50 border border-gray-100 rounded-xl p-4">
             <label className="block text-xs font-bold text-gray-400 uppercase mb-2">Justificante de cobro</label>
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-              {formData.paymentReceiptFile ? (
+            {formData.paymentReceiptFile ? (
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                 <div className="text-sm font-semibold text-gray-700 flex items-center gap-3">
                   <a href={getReceiptUrl(formData.paymentReceiptFile)} target="_blank" rel="noreferrer" className="text-blue-600 hover:underline">
                     Ver justificante
@@ -647,11 +648,35 @@ export const ReservationModal: React.FC<ReservationModalProps> = ({ rooms: initi
                     Borrar
                   </button>
                 </div>
-              ) : (
-                <div className="text-xs text-gray-400">Sin justificante</div>
-              )}
-              <label className="inline-flex items-center justify-center px-4 py-2 text-xs font-bold text-white bg-blue-600 rounded-lg hover:bg-blue-700 cursor-pointer">
-                {receiptUploading ? 'Subiendo...' : 'Subir archivo'}
+                <label className="inline-flex items-center justify-center px-4 py-2 text-xs font-bold text-white bg-blue-600 rounded-lg hover:bg-blue-700 cursor-pointer">
+                  {receiptUploading ? 'Subiendo...' : 'Reemplazar'}
+                  <input
+                    type="file"
+                    accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
+                    className="hidden"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) uploadPaymentReceipt(file);
+                      e.currentTarget.value = '';
+                    }}
+                  />
+                </label>
+              </div>
+            ) : (
+              <label
+                className={`flex flex-col items-center justify-center border-2 border-dashed rounded-xl p-6 cursor-pointer transition-all ${receiptDragOver ? 'border-blue-500 bg-blue-50' : 'border-gray-300 hover:border-blue-400 hover:bg-white'}`}
+                onDragOver={(e) => { e.preventDefault(); setReceiptDragOver(true); }}
+                onDragLeave={() => setReceiptDragOver(false)}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  setReceiptDragOver(false);
+                  const file = e.dataTransfer.files?.[0];
+                  if (file) uploadPaymentReceipt(file);
+                }}
+              >
+                <svg className={`w-8 h-8 mb-2 ${receiptDragOver ? 'text-blue-500' : 'text-gray-300'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path></svg>
+                <span className="text-xs font-bold text-gray-500">{receiptUploading ? 'Subiendo...' : 'Arrastra un archivo o haz click'}</span>
+                <span className="text-[10px] text-gray-400 mt-1">PDF, DOC, JPG, PNG</span>
                 <input
                   type="file"
                   accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
@@ -663,7 +688,7 @@ export const ReservationModal: React.FC<ReservationModalProps> = ({ rooms: initi
                   }}
                 />
               </label>
-            </div>
+            )}
             {receiptError && <p className="mt-2 text-xs font-bold text-red-600">{receiptError}</p>}
           </div>
 

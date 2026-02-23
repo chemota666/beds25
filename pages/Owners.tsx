@@ -11,6 +11,7 @@ export const Owners: React.FC = () => {
   const [contractUploadError, setContractUploadError] = useState<string | null>(null);
   const [contractFileName, setContractFileName] = useState<string | null>(null);
   const [contractFiles, setContractFiles] = useState<Array<{ filename: string; url: string }>>([]);
+  const [contractDragOver, setContractDragOver] = useState(false);
 
   useEffect(() => {
     loadOwners();
@@ -324,20 +325,32 @@ export const Owners: React.FC = () => {
                 <h3 className="text-xs font-black text-blue-600 uppercase tracking-[0.2em]">📄 Contrato del Propietario</h3>
                 <p className="text-xs text-blue-600 italic">Formatos permitidos: PDF, DOC, DOCX (máx. 10MB)</p>
                 <div className="space-y-3">
-                  <input
-                    type="file"
-                    accept=".pdf,.doc,.docx"
-                    disabled={uploadingContract}
-                    onChange={(e) => {
-                      const file = e.target.files?.[0];
+                  <label
+                    className={`flex flex-col items-center justify-center border-2 border-dashed rounded-xl p-4 cursor-pointer transition-all ${contractDragOver ? 'border-blue-500 bg-blue-100' : 'border-blue-300 hover:border-blue-500 hover:bg-white'} ${isNewOwner ? 'opacity-50 cursor-not-allowed' : ''}`}
+                    onDragOver={(e) => { if (!isNewOwner) { e.preventDefault(); setContractDragOver(true); } }}
+                    onDragLeave={() => setContractDragOver(false)}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      setContractDragOver(false);
+                      if (isNewOwner) return;
+                      const file = e.dataTransfer.files?.[0];
                       if (file) handleContractUpload(file);
-                      e.currentTarget.value = '';
                     }}
-                    className="w-full bg-white border border-blue-200 rounded-xl p-3 font-semibold text-gray-800 focus:ring-4 focus:ring-blue-50 outline-none transition-all"
-                  />
-                  {uploadingContract && (
-                    <p className="text-xs font-bold text-blue-600">Subiendo contrato...</p>
-                  )}
+                  >
+                    <svg className={`w-6 h-6 mb-1 ${contractDragOver ? 'text-blue-500' : 'text-blue-300'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path></svg>
+                    <span className="text-xs font-bold text-blue-400">{uploadingContract ? 'Subiendo...' : 'Arrastra un archivo o haz click'}</span>
+                    <input
+                      type="file"
+                      accept=".pdf,.doc,.docx"
+                      disabled={uploadingContract || isNewOwner}
+                      className="hidden"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) handleContractUpload(file);
+                        e.currentTarget.value = '';
+                      }}
+                    />
+                  </label>
                   {contractFileName && (
                     <p className="text-xs font-bold text-green-600">Archivo subido: {contractFileName}</p>
                   )}

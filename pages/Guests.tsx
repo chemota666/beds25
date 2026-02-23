@@ -28,6 +28,11 @@ export const Guests: React.FC = () => {
     contractFile: null,
     depositReceiptFile: null
   });
+  const [docDragOver, setDocDragOver] = useState<Record<GuestDocField, boolean>>({
+    dniFile: false,
+    contractFile: false,
+    depositReceiptFile: false
+  });
   const [resModalOpen, setResModalOpen] = useState(false);
   const [editingReservation, setEditingReservation] = useState<Reservation | null>(null);
 
@@ -755,9 +760,19 @@ export const Guests: React.FC = () => {
                                )}
                              </div>
                            ) : (
-                             <label className="flex flex-col items-center justify-center h-20 border-2 border-dashed border-gray-200 rounded-xl cursor-pointer hover:bg-white hover:border-blue-400 transition-all group">
-                               <svg className="w-6 h-6 text-gray-300 group-hover:text-blue-500 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4"></path></svg>
-                               <span className="text-[10px] font-black text-gray-400 uppercase">Subir</span>
+                             <label
+                               className={`flex flex-col items-center justify-center h-20 border-2 border-dashed rounded-xl cursor-pointer transition-all group ${docDragOver[doc.field] ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:bg-white hover:border-blue-400'}`}
+                               onDragOver={(e) => { e.preventDefault(); setDocDragOver(prev => ({ ...prev, [doc.field]: true })); }}
+                               onDragLeave={() => setDocDragOver(prev => ({ ...prev, [doc.field]: false }))}
+                               onDrop={(e) => {
+                                 e.preventDefault();
+                                 setDocDragOver(prev => ({ ...prev, [doc.field]: false }));
+                                 const file = e.dataTransfer.files?.[0];
+                                 if (file) uploadGuestDocument(doc.field, file);
+                               }}
+                             >
+                               <svg className={`w-6 h-6 mb-1 ${docDragOver[doc.field] ? 'text-blue-500' : 'text-gray-300 group-hover:text-blue-500'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path></svg>
+                               <span className="text-[10px] font-black text-gray-400 uppercase">{docUploading[doc.field] ? 'Subiendo...' : 'Arrastra o click'}</span>
                                <input
                                  type="file"
                                  className="hidden"
@@ -767,9 +782,6 @@ export const Guests: React.FC = () => {
                                    e.currentTarget.value = '';
                                  }}
                                />
-                               {docUploading[doc.field] && (
-                                 <p className="text-[10px] font-bold text-blue-600 mt-2">Subiendo...</p>
-                               )}
                                {docError[doc.field] && (
                                  <p className="text-[10px] font-bold text-red-600 mt-2">{docError[doc.field]}</p>
                                )}
